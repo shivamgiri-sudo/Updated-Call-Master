@@ -1,0 +1,231 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { apiGet } from "./services/api";
+import "./styles.css";
+
+type ApiResponse<T> = { success: boolean; data: T };
+
+type ProcessRow = {
+  process_id: number;
+  process_code: string;
+  process_name: string;
+  process_type: string;
+};
+
+type MasterSummary = {
+  total_processes: number;
+  total_calls: number;
+  total_agents: number;
+  transcript_available: number;
+  ai_audit_completed: number;
+  manual_audit_completed: number;
+  avg_quality_score: number | null;
+  fatal_count: number;
+  escalation_count: number;
+  coaching_trigger_count: number;
+};
+
+type CallRow = {
+  call_id: number;
+  source_call_id: string;
+  process_code: string;
+  process_name: string;
+  process_type: string;
+  source_agent_name: string;
+  lead_id: string;
+  call_direction: string;
+  call_datetime: string;
+  duration_sec: number;
+  transcript_status: string;
+  final_audit_status: string;
+};
+
+function KpiCard({ label, value, sub }: { label: string; value: any; sub?: string }) {
+  return (
+    <div className="card kpi">
+      <div className="label">{label}</div>
+      <div className="value">{value ?? "-"}</div>
+      <div className="sub">{sub}</div>
+    </div>
+  );
+}
+
+function App() {
+  const [processes, setProcesses] = useState<ProcessRow[]>([]);
+  const [selectedProcess, setSelectedProcess] = useState("FINNABLE");
+  const [summary, setSummary] = useState<MasterSummary | null>(null);
+  const [calls, setCalls] = useState<CallRow[]>([]);
+  const [audit, setAudit] = useState<any>(null);
+  const [outboundFunnel, setOutboundFunnel] = useState<any>(null);
+  const [error, setError] = useState("");
+
+  const selected = useMemo(
+    () => processes.find((p) => p.process_code === selectedProcess),
+    [processes, selectedProcess]
+  );
+
+  useEffect(() => {
+    apiGet<ApiResponse<ProcessRow[]>>("/api/processes")
+      .then((r) => {
+        setProcesses(r.data);
+        const first = r.data.find((x) => x.process_code === "FINNABLE") || r.data[0];
+        if (first) setSelectedProcess(first.process_code);
+      })
+      .catch((e) => setError(e.message));
+
+    apiGet<ApiResponse<MasterSummary>>("/api/master/summary")
+      .then((r) => setSummary(r.data))
+      .catch((e) => setError(e.message));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProcess) return;
+
+    apiGet<ApiResponse<CallRow[]>>(`/api/calls?processCode=${encodeURIComponent(selectedProcess)}`)
+      .then((r) => setCalls(r.data))
+      .catch((e) => setError(e.message));
+
+    apiGet<ApiResponse<any>>(`/api/outbound/${encodeURIComponent(selectedProcess)}/funnel`)
+      .then((r) => setOutboundFunnel(r.data))
+      .catch(() => setOutboundFunnel(null));
+  }, [selectedProcess]);
+
+  function openAudit(callId: number) {
+    apiGet<ApiResponse<any>>(`/api/calls/${callId}/audit360`)
+      .then((r) => setAudit(r.data))
+      .catch((e) => setError(e.message));
+  }
+
+  return (
+    <div className="app">
+      <aside>
+        <div className="brand">
+          <div className="mark" />
+          <div>
+            <h1>Call Master</h1>
+            <p>Control Tower</p>
+          </div>
+        </div>
+        <nav>
+          <a className="active">T&Q Master</a>
+          <a>Process Performance</a>
+          <a>Call Audit 360</a>
+          <a>Outbound Funnel</a>
+          <a>Inbound Quality</a>
+          <a>LMS Governance</a>
+        </nav>
+      </aside>
+
+      <main>
+        <div className="topbar">
+          <div>
+            <h2>One Call Master Link</h2>
+            <p>Inbound + Outbound process routing through process code</p>
+          </div>
+          <select value={selectedProcess} onChange={(e) => setSelectedProcess(e.target.value)}>
+            {processes.map((p) => (
+              <option key={p.process_id} value={p.process_code}>
+                {p.process_name} | {p.process_code}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {error && <div className="error">{error}</div>}
+
+        <section className="grid kpis">
+          <KpiCard label="Total Processes" value={summary?.total_processes} sub="From summary table" />
+          <KpiCard label="Total Calls" value={summary?.total_calls} sub="Latest summary date" />
+          <KpiCard label="Agents" value={summary?.total_agents} sub="Summed daily agents" />
+          <KpiCard label="Transcripts" value={summary?.transcript_available} sub="Available" />
+          <KpiCard label="AI Audit" value={summary?.ai_audit_completed} sub="Completed" />
+          <KpiCard label="Manual Audit" value={summary?.manual_audit_completed} sub="Completed" />
+        </section>
+
+        <section className="grid two">
+          <div className="card">
+            <h3>Selected Process</h3>
+            <table>
+              <tbody>
+                <tr><td>Process Code</td><td>{selected?.process_code}</td></tr>
+                <tr><td>Process Name</td><td>{selected?.process_name}</td></tr>
+                <tr><td>Process Type</td><td>{selected?.process_type}</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card">
+            <h3>Outbound Funnel Snapshot</h3>
+            <table>
+              <tbody>
+                <tr><td>Total Calls</td><td>{outboundFunnel?.total_calls ?? "-"}</td></tr>
+                <tr><td>Opening Done</td><td>{outboundFunnel?.opening_done_count ?? "-"}</td></tr>
+                <tr><td>Offered</td><td>{outboundFunnel?.offered_count ?? "-"}</td></tr>
+                <tr><td>Sale Done</td><td>{outboundFunnel?.sale_done_count ?? "-"}</td></tr>
+                <tr><td>Conversion %</td><td>{outboundFunnel?.conversion_percent ?? "-"}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="card">
+          <h3>Recent Calls</h3>
+          <div className="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Call ID</th>
+                  <th>Source Call</th>
+                  <th>Agent</th>
+                  <th>Lead</th>
+                  <th>Date</th>
+                  <th>Transcript</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calls.map((c) => (
+                  <tr key={c.call_id}>
+                    <td>{c.call_id}</td>
+                    <td>{c.source_call_id}</td>
+                    <td>{c.source_agent_name}</td>
+                    <td>{c.lead_id}</td>
+                    <td>{c.call_datetime}</td>
+                    <td>{c.transcript_status}</td>
+                    <td><button onClick={() => openAudit(c.call_id)}>Open Audit 360</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {audit && (
+          <section className="card audit">
+            <h3>Call Audit 360 · {audit.call_id}</h3>
+            <div className="grid two">
+              <div>
+                <h4>Call Summary</h4>
+                <table>
+                  <tbody>
+                    <tr><td>Process</td><td>{audit.process_name}</td></tr>
+                    <tr><td>Agent</td><td>{audit.source_agent_name}</td></tr>
+                    <tr><td>Lead</td><td>{audit.lead_id}</td></tr>
+                    <tr><td>Risk</td><td>{audit.risk_level || "NA"}</td></tr>
+                    <tr><td>AI Status</td><td>{audit.processing_status || "NA"}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <h4>Transcript Preview</h4>
+                <pre>{audit.transcript_preview || "No transcript found"}</pre>
+              </div>
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(<App />);

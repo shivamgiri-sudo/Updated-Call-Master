@@ -1,0 +1,32 @@
+:root{
+  font-family: Arial, Helvetica, sans-serif;
+  color:#0f172a;
+  background:#edf7f5;
+}
+body{margin:0}
+.app{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+aside{background:#fff;border-right:1px solid #d8e6e8;padding:22px;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:12px;align-items:center;margin-bottom:24px}
+.mark{width:44px;height:44px;border-radius:16px;background:conic-gradient(#0f766e,#14b8a6,#2563eb,#0f766e)}
+h1{font-size:20px;margin:0} p{margin:4px 0 0;color:#64748b}
+nav{display:grid;gap:8px}
+nav a{padding:13px 14px;border-radius:14px;color:#475569;font-weight:800}
+nav a.active{background:#dbeafe;color:#075985}
+main{padding:22px}
+.topbar{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #d8e6e8;border-radius:22px;padding:16px 18px;box-shadow:0 14px 36px rgba(15,23,42,.09)}
+select{padding:10px 12px;border:1px solid #d8e6e8;border-radius:12px}
+.grid{display:grid;gap:16px}
+.kpis{grid-template-columns:repeat(6,1fr);margin:18px 0}
+.two{grid-template-columns:1fr 1fr}
+.card{background:#fff;border:1px solid #d8e6e8;border-radius:20px;padding:16px;box-shadow:0 14px 36px rgba(15,23,42,.09)}
+.kpi .label{font-size:12px;color:#64748b;text-transform:uppercase;font-weight:900}
+.kpi .value{font-size:32px;font-weight:900;margin:8px 0}
+.kpi .sub{font-size:12px;color:#64748b}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#0f172a;color:white;text-align:left;padding:10px}
+td{border-bottom:1px solid #e2e8f0;padding:10px;vertical-align:top}
+button{background:#0f766e;color:white;border:0;border-radius:10px;padding:8px 10px;font-weight:800;cursor:pointer}
+.scroll{max-height:420px;overflow:auto;border:1px solid #d8e6e8;border-radius:12px}
+pre{background:#0b1220;color:#e2e8f0;border-radius:14px;padding:14px;white-space:pre-wrap;max-height:360px;overflow:auto}
+.error{margin:16px 0;background:#fee2e2;color:#991b1b;border-radius:12px;padding:12px;font-weight:800}
+@media(max-width:1100px){.app{grid-template-columns:1fr}aside{position:static;height:auto}.kpis{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
