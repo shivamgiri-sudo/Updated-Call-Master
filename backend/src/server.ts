@@ -15,6 +15,7 @@ import exportRoutes from "./modules/export/export.routes";
 import coachingRoutes from "./modules/coaching/coaching.routes";
 import governanceRoutes from "./modules/governance/governance.routes";
 import diagnosticsRoutes from "./modules/diagnostics/diagnostics.routes";
+import metricsRoutes from "./modules/metrics/metrics.routes";
 import { authenticateToken, requireProcessAccess } from "./middleware/auth";
 
 dotenv.config();
@@ -45,6 +46,7 @@ app.use("/api/export", authenticateToken, requireProcessAccess, exportRoutes);
 app.use("/api/coaching", authenticateToken, coachingRoutes);
 app.use("/api/governance", authenticateToken, governanceRoutes);
 app.use("/api/diagnostics", authenticateToken, diagnosticsRoutes);
+app.use("/api/metrics", authenticateToken, metricsRoutes);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
