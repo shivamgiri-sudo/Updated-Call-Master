@@ -5,6 +5,73 @@ import { asyncHandler } from "../../middleware/asyncHandler";
 const router = Router();
 
 type QueryRows = any[];
+type ColumnInfo = { COLUMN_NAME: string; DATA_TYPE: string };
+type FieldSpec = {
+  key: string;
+  label: string;
+  required: boolean;
+  candidates: string[];
+  purpose: string;
+};
+type FieldMapping = FieldSpec & {
+  found_column: string | null;
+  data_type: string | null;
+  status: "FOUND" | "MISSING_REQUIRED" | "MISSING_OPTIONAL";
+};
+type MappingResult = {
+  fields: FieldMapping[];
+  byKey: Record<string, FieldMapping>;
+  summary: {
+    table_schema: string;
+    table_name: string;
+    total_required: number;
+    mapped_required: number;
+    missing_required: number;
+    total_optional: number;
+    mapped_optional: number;
+    missing_optional: number;
+    readiness_percent: number;
+  };
+};
+
+const AUDIT_TABLE = "call_quality_assessment";
+
+const INBOUND_FIELD_SPECS: FieldSpec[] = [
+  { key: "client_id", label: "Client ID", required: true, candidates: ["ClientId", "client_id", "clientid", "client"], purpose: "Process-to-client filtering" },
+  { key: "call_date", label: "Call Date", required: true, candidates: ["CallDate", "call_date", "created_at", "audit_date", "call_datetime", "Date"], purpose: "Date filter and raw audit sorting" },
+  { key: "agent_name", label: "Agent / User Name", required: false, candidates: ["AgentName", "agent_name", "UserName", "user_name", "EmpName", "employee_name", "agent"], purpose: "Agent ranking and drilldown" },
+  { key: "lead_id", label: "Lead / Call ID", required: false, candidates: ["LeadID", "lead_id", "lead", "source_call_id", "call_id", "CallId"], purpose: "Raw audit explorer identity" },
+  { key: "quality_score", label: "CQ / Quality Score", required: true, candidates: ["quality_percentage", "cq_score", "quality_score", "quality_percent", "qualitypercentage", "score"], purpose: "CQ score KPI and ranking" },
+  { key: "fatal_count", label: "Fatal Count / Flag", required: false, candidates: ["fatal_count", "fatal", "fatal_status", "fatal_error", "fatal_flag"], purpose: "Fatal count and fatal percentage" },
+  { key: "sensitive_word", label: "Sensitive Word", required: false, candidates: ["sensetive_word", "sensitive_word", "sensitive_words", "sensitive_word_count", "negative_words"], purpose: "Sensitive word KPI" },
+  { key: "policy_failure", label: "Policy Communication Failure", required: false, candidates: ["policy_communication_failure", "policy_failure", "policy_failure_count", "policycommunicationfailure"], purpose: "Policy failure KPI" },
+  { key: "opening_score", label: "Opening Score", required: false, candidates: ["opening_score", "opening", "call_opening_score"], purpose: "Looker quality score breakdown" },
+  { key: "soft_skill_score", label: "Soft Skill Score", required: false, candidates: ["soft_skill_score", "softskill_score", "soft_skills_score", "soft_skill"], purpose: "Looker quality score breakdown" },
+  { key: "hold_procedure_score", label: "Hold Procedure Score", required: false, candidates: ["hold_procedure_score", "hold_score", "holdprocedure_score"], purpose: "Looker quality score breakdown" },
+  { key: "resolution_score", label: "Resolution Score", required: false, candidates: ["resolution_score", "resolution", "query_resolution_score"], purpose: "Looker quality score breakdown" },
+  { key: "closing_score", label: "Closing Score", required: false, candidates: ["closing_score", "closing", "call_closing_score"], purpose: "Looker quality score breakdown" },
+];
+
+function normaliseColumnName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function safeColumn(column: string | null | undefined): string | null {
+  if (!column || !/^[A-Za-z0-9_]+$/.test(column)) return null;
+  return qid(column);
+}
+
+function sqlString(column: string): string {
+  return `LOWER(TRIM(CAST(${column} AS CHAR)))`;
+}
+
+function numeric(column: string): string {
+  return `CAST(${column} AS DECIMAL(18,4))`;
+}
+
+function found(mapping: MappingResult, key: string): string | null {
+  return safeColumn(mapping.byKey[key]?.found_column);
+}
 
 async function getClientIdFromProcess(processCode: string): Promise<number | null> {
   const sql = `
@@ -26,67 +93,158 @@ async function safeQuery<T>(sql: string, params: any[], fallback: T): Promise<T>
     const [rows]: any = await pool.query(sql, params);
     return rows as T;
   } catch (err) {
-    console.warn("Inbound Looker parity partial query skipped:", err instanceof Error ? err.message : err);
+    console.warn("Inbound dynamic query skipped:", err instanceof Error ? err.message : err);
     return fallback;
   }
 }
 
-function getDateFilter(date: string | undefined, params: any[]): string {
-  if (!date) return "";
-  params.push(date);
-  return "AND DATE(CallDate) = ?";
+async function getAuditColumns(): Promise<ColumnInfo[]> {
+  const sql = `
+    SELECT COLUMN_NAME, DATA_TYPE
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = ?
+      AND TABLE_NAME = ?
+    ORDER BY ORDINAL_POSITION
+  `;
+  const [rows]: any = await pool.query(sql, [DB.AUDIT, AUDIT_TABLE]);
+  return rows || [];
 }
+
+async function getInboundFieldMapping(): Promise<MappingResult> {
+  const columns = await getAuditColumns();
+  const lookup = new Map<string, ColumnInfo>();
+
+  for (const col of columns) {
+    lookup.set(normaliseColumnName(col.COLUMN_NAME), col);
+  }
+
+  const fields: FieldMapping[] = INBOUND_FIELD_SPECS.map((spec) => {
+    const match = spec.candidates
+      .map((candidate) => lookup.get(normaliseColumnName(candidate)))
+      .find(Boolean) as ColumnInfo | undefined;
+
+    const foundColumn = match?.COLUMN_NAME || null;
+    const status = foundColumn ? "FOUND" : spec.required ? "MISSING_REQUIRED" : "MISSING_OPTIONAL";
+
+    return {
+      ...spec,
+      found_column: foundColumn,
+      data_type: match?.DATA_TYPE || null,
+      status,
+    };
+  });
+
+  const byKey = fields.reduce<Record<string, FieldMapping>>((acc, item) => {
+    acc[item.key] = item;
+    return acc;
+  }, {});
+
+  const required = fields.filter((f) => f.required);
+  const optional = fields.filter((f) => !f.required);
+  const mappedRequired = required.filter((f) => f.found_column).length;
+  const mappedOptional = optional.filter((f) => f.found_column).length;
+  const readinessBase = fields.length || 1;
+  const readiness = Math.round((fields.filter((f) => f.found_column).length / readinessBase) * 10000) / 100;
+
+  return {
+    fields,
+    byKey,
+    summary: {
+      table_schema: DB.AUDIT,
+      table_name: AUDIT_TABLE,
+      total_required: required.length,
+      mapped_required: mappedRequired,
+      missing_required: required.length - mappedRequired,
+      total_optional: optional.length,
+      mapped_optional: mappedOptional,
+      missing_optional: optional.length - mappedOptional,
+      readiness_percent: readiness,
+    },
+  };
+}
+
+function buildWhere(mapping: MappingResult, clientId: number, date?: string): { sql: string; params: any[]; dateApplied: boolean } {
+  const clientCol = found(mapping, "client_id");
+  const dateCol = found(mapping, "call_date");
+  const clauses: string[] = [];
+  const params: any[] = [];
+  let dateApplied = false;
+
+  if (clientCol) {
+    clauses.push(`${clientCol} = ?`);
+    params.push(clientId);
+  } else {
+    clauses.push("1 = 0");
+  }
+
+  if (date && dateCol) {
+    clauses.push(`DATE(${dateCol}) = ?`);
+    params.push(date);
+    dateApplied = true;
+  }
+
+  return { sql: `WHERE ${clauses.join(" AND ")}`, params, dateApplied };
+}
+
+function buildKpiSelect(mapping: MappingResult): string {
+  const qualityCol = found(mapping, "quality_score");
+  const fatalCol = found(mapping, "fatal_count");
+  const sensitiveCol = found(mapping, "sensitive_word");
+  const policyCol = found(mapping, "policy_failure");
+
+  const cqExpr = qualityCol ? `ROUND(AVG(${numeric(qualityCol)}), 2)` : "0";
+  const fatalExpr = fatalCol
+    ? `SUM(CASE WHEN COALESCE(${numeric(fatalCol)}, 0) > 0 OR ${sqlString(fatalCol)} IN ('yes','y','true','fatal','fail','failed','1') THEN 1 ELSE 0 END)`
+    : "0";
+  const sensitiveExpr = sensitiveCol
+    ? `SUM(CASE WHEN ${sensitiveCol} IS NOT NULL AND ${sqlString(sensitiveCol)} NOT IN ('','no','none','null','n/a','na','0') THEN 1 ELSE 0 END)`
+    : "0";
+  const policyExpr = policyCol
+    ? `SUM(CASE WHEN COALESCE(${numeric(policyCol)}, 0) > 0 OR ${sqlString(policyCol)} IN ('yes','y','true','fail','failed','1') THEN 1 ELSE 0 END)`
+    : "0";
+
+  return `
+    COUNT(*) AS audit_count,
+    ${cqExpr} AS cq_score,
+    ${fatalExpr} AS fatal_count,
+    ${sensitiveExpr} AS sensitive_word_count,
+    ${policyExpr} AS policy_failure_count
+  `;
+}
+
+router.get("/:processCode/schema-check", asyncHandler(async (req, res) => {
+  const { processCode } = req.params;
+  const clientId = await getClientIdFromProcess(processCode);
+  const mapping = await getInboundFieldMapping();
+  res.json({ success: true, processCode, clientId, data: mapping });
+}));
 
 router.get("/:processCode/quality", asyncHandler(async (req, res) => {
   const { processCode } = req.params;
   const date = req.query.date as string | undefined;
-
   const clientId = await getClientIdFromProcess(processCode);
 
   if (!clientId) {
-    return res.json({
-      success: true,
-      processCode,
-      data: {
-        audit_count: 0,
-        cq_score: 0,
-        fatal_count: 0,
-        sensitive_word_count: 0,
-        policy_failure_count: 0,
-      },
-    });
+    return res.json({ success: true, processCode, data: { audit_count: 0, cq_score: 0, fatal_count: 0, sensitive_word_count: 0, policy_failure_count: 0 } });
   }
 
-  const params: any[] = [clientId];
-  const dateSql = getDateFilter(date, params);
-
+  const mapping = await getInboundFieldMapping();
+  const where = buildWhere(mapping, clientId, date);
   const sql = `
-    SELECT
-      COUNT(*) AS audit_count,
-      ROUND(AVG(quality_percentage), 2) AS cq_score,
-      SUM(CASE WHEN COALESCE(fatal_count, 0) > 0 THEN 1 ELSE 0 END) AS fatal_count,
-      SUM(CASE
-        WHEN sensetive_word IS NOT NULL
-         AND LOWER(TRIM(CAST(sensetive_word AS CHAR))) NOT IN ('', 'no', 'none', 'null', 'n/a', 'na')
-        THEN 1 ELSE 0
-      END) AS sensitive_word_count,
-      SUM(CASE
-        WHEN LOWER(TRIM(CAST(policy_communication_failure AS CHAR))) IN ('yes', 'y', 'true', '1')
-        THEN 1 ELSE 0
-      END) AS policy_failure_count
-    FROM ${qid(DB.AUDIT)}.call_quality_assessment
-    WHERE ClientId = ?
-    ${dateSql}
+    SELECT ${buildKpiSelect(mapping)}
+    FROM ${qid(DB.AUDIT)}.${qid(AUDIT_TABLE)}
+    ${where.sql}
   `;
 
-  const [rows]: any = await pool.query(sql, params);
-  res.json({ success: true, processCode, clientId, data: rows?.[0] || {} });
+  const rows = await safeQuery<QueryRows>(sql, where.params, []);
+  res.json({ success: true, processCode, clientId, schema: mapping.summary, data: rows?.[0] || {} });
 }));
 
 router.get("/:processCode/looker-parity", asyncHandler(async (req, res) => {
   const { processCode } = req.params;
   const date = req.query.date as string | undefined;
   const clientId = await getClientIdFromProcess(processCode);
+  const mapping = await getInboundFieldMapping();
 
   if (!clientId) {
     return res.json({
@@ -94,6 +252,7 @@ router.get("/:processCode/looker-parity", asyncHandler(async (req, res) => {
       processCode,
       clientId: null,
       data: {
+        schema: mapping,
         kpis: { audit_count: 0, cq_score: 0, fatal_count: 0, fatal_percent: 0, target_cq: 85, sensitive_word_count: 0, policy_failure_count: 0 },
         score_breakdown: [],
         agent_rank: [],
@@ -102,27 +261,13 @@ router.get("/:processCode/looker-parity", asyncHandler(async (req, res) => {
     });
   }
 
-  const baseParams: any[] = [clientId];
-  const dateSql = getDateFilter(date, baseParams);
+  const where = buildWhere(mapping, clientId, date);
 
   const kpiRows = await safeQuery<QueryRows>(`
-    SELECT
-      COUNT(*) AS audit_count,
-      ROUND(AVG(quality_percentage), 2) AS cq_score,
-      SUM(CASE WHEN COALESCE(fatal_count, 0) > 0 THEN 1 ELSE 0 END) AS fatal_count,
-      SUM(CASE
-        WHEN sensetive_word IS NOT NULL
-         AND LOWER(TRIM(CAST(sensetive_word AS CHAR))) NOT IN ('', 'no', 'none', 'null', 'n/a', 'na')
-        THEN 1 ELSE 0
-      END) AS sensitive_word_count,
-      SUM(CASE
-        WHEN LOWER(TRIM(CAST(policy_communication_failure AS CHAR))) IN ('yes', 'y', 'true', '1')
-        THEN 1 ELSE 0
-      END) AS policy_failure_count
-    FROM ${qid(DB.AUDIT)}.call_quality_assessment
-    WHERE ClientId = ?
-    ${dateSql}
-  `, baseParams, []);
+    SELECT ${buildKpiSelect(mapping)}
+    FROM ${qid(DB.AUDIT)}.${qid(AUDIT_TABLE)}
+    ${where.sql}
+  `, where.params, []);
 
   const rawKpis = kpiRows?.[0] || {};
   const auditCount = Number(rawKpis.audit_count || 0);
@@ -137,65 +282,83 @@ router.get("/:processCode/looker-parity", asyncHandler(async (req, res) => {
     policy_failure_count: Number(rawKpis.policy_failure_count || 0),
   };
 
-  const scoreRows = await safeQuery<QueryRows>(`
-    SELECT
-      ROUND(AVG(opening_score), 2) AS opening_score,
-      ROUND(AVG(soft_skill_score), 2) AS soft_skill_score,
-      ROUND(AVG(hold_procedure_score), 2) AS hold_procedure_score,
-      ROUND(AVG(resolution_score), 2) AS resolution_score,
-      ROUND(AVG(closing_score), 2) AS closing_score
-    FROM ${qid(DB.AUDIT)}.call_quality_assessment
-    WHERE ClientId = ?
-    ${dateSql}
-  `, baseParams, []);
+  const scoreFields = ["opening_score", "soft_skill_score", "hold_procedure_score", "resolution_score", "closing_score"];
+  const scoreSelects = scoreFields
+    .map((key) => {
+      const col = found(mapping, key);
+      return col ? `ROUND(AVG(${numeric(col)}), 2) AS ${qid(key)}` : null;
+    })
+    .filter(Boolean);
+
+  const scoreRows = scoreSelects.length
+    ? await safeQuery<QueryRows>(`
+        SELECT ${scoreSelects.join(",\n")}
+        FROM ${qid(DB.AUDIT)}.${qid(AUDIT_TABLE)}
+        ${where.sql}
+      `, where.params, [])
+    : [];
 
   const score = scoreRows?.[0] || {};
-  const score_breakdown = [
-    { code: "opening_score", label: "Opening Score", column: "opening_score", score: score.opening_score },
-    { code: "soft_skill_score", label: "Soft Skill Score", column: "soft_skill_score", score: score.soft_skill_score },
-    { code: "hold_procedure_score", label: "Hold Procedure Score", column: "hold_procedure_score", score: score.hold_procedure_score },
-    { code: "resolution_score", label: "Resolution Score", column: "resolution_score", score: score.resolution_score },
-    { code: "closing_score", label: "Closing Score", column: "closing_score", score: score.closing_score },
-  ].filter((item) => item.score !== null && item.score !== undefined);
+  const score_breakdown = scoreFields
+    .map((key) => {
+      const field = mapping.byKey[key];
+      return {
+        code: key,
+        label: field?.label || key,
+        column: field?.found_column,
+        score: score[key],
+      };
+    })
+    .filter((item) => item.column && item.score !== null && item.score !== undefined);
 
-  const agentRank = await safeQuery<QueryRows>(`
-    SELECT
-      AgentName AS agent_name,
-      COUNT(*) AS audit_count,
-      ROUND(AVG(quality_percentage), 2) AS cq_score,
-      SUM(CASE WHEN COALESCE(fatal_count, 0) > 0 THEN 1 ELSE 0 END) AS fatal_count,
-      SUM(CASE WHEN LOWER(TRIM(CAST(policy_communication_failure AS CHAR))) IN ('yes', 'y', 'true', '1') THEN 1 ELSE 0 END) AS policy_failure_count,
-      SUM(CASE WHEN sensetive_word IS NOT NULL AND LOWER(TRIM(CAST(sensetive_word AS CHAR))) NOT IN ('', 'no', 'none', 'null', 'n/a', 'na') THEN 1 ELSE 0 END) AS sensitive_word_count
-    FROM ${qid(DB.AUDIT)}.call_quality_assessment
-    WHERE ClientId = ?
-    ${dateSql}
-    GROUP BY AgentName
-    ORDER BY cq_score ASC, fatal_count DESC, policy_failure_count DESC
-    LIMIT 25
-  `, baseParams, []);
+  const agentCol = found(mapping, "agent_name");
+  const agentRank = agentCol
+    ? await safeQuery<QueryRows>(`
+        SELECT
+          ${agentCol} AS agent_name,
+          ${buildKpiSelect(mapping)}
+        FROM ${qid(DB.AUDIT)}.${qid(AUDIT_TABLE)}
+        ${where.sql}
+        GROUP BY ${agentCol}
+        ORDER BY cq_score ASC, fatal_count DESC, policy_failure_count DESC
+        LIMIT 25
+      `, where.params, [])
+    : [];
 
-  const rawAudits = await safeQuery<QueryRows>(`
-    SELECT
-      id,
-      CallDate,
-      AgentName,
-      LeadID,
-      quality_percentage,
-      fatal_count,
-      sensetive_word,
-      policy_communication_failure
-    FROM ${qid(DB.AUDIT)}.call_quality_assessment
-    WHERE ClientId = ?
-    ${dateSql}
-    ORDER BY CallDate DESC, id DESC
-    LIMIT 50
-  `, baseParams, []);
+  const rawSelects = [
+    ["client_id", "client_id"],
+    ["call_date", "call_date"],
+    ["agent_name", "agent_name"],
+    ["lead_id", "lead_id"],
+    ["quality_score", "cq_score"],
+    ["fatal_count", "fatal_count"],
+    ["sensitive_word", "sensitive_word"],
+    ["policy_failure", "policy_failure"],
+  ]
+    .map(([key, alias]) => {
+      const col = found(mapping, key);
+      return col ? `${col} AS ${qid(alias)}` : null;
+    })
+    .filter(Boolean);
+
+  const dateCol = found(mapping, "call_date");
+  const rawAudits = rawSelects.length
+    ? await safeQuery<QueryRows>(`
+        SELECT ${rawSelects.join(",\n")}
+        FROM ${qid(DB.AUDIT)}.${qid(AUDIT_TABLE)}
+        ${where.sql}
+        ${dateCol ? `ORDER BY ${dateCol} DESC` : ""}
+        LIMIT 50
+      `, where.params, [])
+    : [];
 
   res.json({
     success: true,
     processCode,
     clientId,
     data: {
+      schema: mapping,
+      date_filter_applied: where.dateApplied,
       kpis,
       score_breakdown,
       agent_rank: agentRank,
