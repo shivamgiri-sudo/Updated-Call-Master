@@ -64,6 +64,24 @@ This contains read-only templates for:
 
 These queries use `db_external.CallDetails` and should be parameterized by date range.
 
+### 4. MySQL-backed funnel API upgrade
+
+Updated `backend/src/modules/funnels/funnels.routes.ts`.
+
+The Sales Funnel and Rejection Funnel routes now attempt read-only MySQL aggregation first.
+
+If the database is unavailable, client mapping is missing, or credentials are not configured, the routes return the premium demo fallback payload instead of breaking the UI.
+
+Updated routes:
+
+- `/api/funnels/:processCode/sales-transition`
+- `/api/funnels/:processCode/rejection-transition`
+
+The API response now includes a `source` field:
+
+- `mysql_readonly` when live read-only data is returned
+- `demo_fallback` when fallback data is returned
+
 ## Data conclusion
 
 The current database is strong enough to build the main analytics product:
@@ -83,20 +101,16 @@ The database is not yet complete for true real-time SaaS features:
 - Coaching calendar reminders
 - Client portal sharing
 
-## Current blocker
-
-Some direct backend route-file pushes were blocked by the GitHub connector safety layer. Documentation and SQL pushes succeeded. Continue pushing smaller safe increments and validate each successful commit.
-
 ## Next target
 
 Continue the page-by-page build cycle:
 
-1. Executive IQ production binding
-2. Sales Funnel production binding
-3. Rejection Funnel production binding
-4. Live Assist partial-production design
-5. Email Template Center app-owned schema and UI
-6. Coaching Calendar app-owned schema and UI
+1. Validate Sales Funnel and Rejection Funnel with real DB credentials
+2. Improve Sales Funnel role review and communication templates
+3. Improve Rejection Funnel role review and communication templates
+4. Start Live Assist partial-production design
+5. Build Email Template Center using app-owned schema
+6. Build Coaching Calendar using app-owned schema
 
 ## Safety rule
 
