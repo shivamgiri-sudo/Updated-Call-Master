@@ -126,6 +126,34 @@ Added `docs/COACHING_CALENDAR_CONTRACT.md`.
 
 The contract defines calendar event types, role review, page requirements and proposed API contract.
 
+### 9. Complete Enterprise Console V2
+
+Added `frontend/src/EnterpriseConsoleV2.tsx` and switched `frontend/src/main.tsx` to use it.
+
+The V2 console includes all major product pages:
+
+- Executive IQ
+- Sales Funnel
+- Rejection Funnel
+- Live Assist
+- AI Studio
+- Best Call Library
+- SaaS Control
+- Critical Insights
+- Enterprise Readiness
+- Email Template Center
+- Coaching Calendar
+- Client Portal
+
+### 10. New backend route files
+
+Added demo/readiness route files for:
+
+- `backend/src/modules/calendar/calendar.routes.ts`
+- `backend/src/modules/communications/communications.routes.ts`
+
+Server wiring for these two routes was blocked by the connector safety layer in this pass, so the route files exist but must be mounted in `server.ts` when the connector allows or by a local developer.
+
 ## Data conclusion
 
 The current database is strong enough to build the main analytics product:
@@ -149,12 +177,12 @@ The database is not yet complete for true real-time SaaS features:
 
 Continue the page-by-page build cycle:
 
-1. Wire Live Assist frontend to pipeline and readiness
-2. Build Email Template Center UI using the app-owned contract
-3. Build Coaching Calendar UI using the app-owned contract
+1. Run local backend/frontend builds
+2. Wire Calendar and Communications routes in `server.ts`
+3. Validate Sales Funnel and Rejection Funnel with real DB credentials
 4. Bind AI Studio to prompt and framework tables
 5. Bind Best Call Library to coaching and call library tables
-6. Validate Sales Funnel and Rejection Funnel with real DB credentials
+6. Add tenant tables and feature flag persistence
 
 ## Safety rule
 
