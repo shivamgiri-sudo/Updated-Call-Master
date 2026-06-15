@@ -9,8 +9,8 @@ Build page -> Debug -> Test -> Enhance -> Role review -> Communication review ->
 | Page | Data status | Build | Debug | Test | Enhance | Role review | Communication review | Commit status | Next action |
 |---|---|---|---|---|---|---|---|---|---|
 | Executive IQ | Ready | Partial | Partial | Pending local build | Partial | Partial | Partial | In progress | Bind production queries and improve email summary preview |
-| Sales Funnel | Ready | MySQL-backed API added | Partial | Pending local build | In progress | Pending | Pending | Committed API upgrade | Validate with real DB credentials and improve page role review |
-| Rejection Funnel | Ready | MySQL-backed API added | Partial | Pending local build | In progress | Pending | Pending | Committed API upgrade | Validate with real DB credentials and improve page role review |
+| Sales Funnel | Ready | MySQL-backed API + polished UI | Partial | Pending local build | Done for current cycle | Added | Added | Frontend/API committed | Validate with real DB credentials and run build |
+| Rejection Funnel | Ready | MySQL-backed API + polished UI | Partial | Pending local build | Done for current cycle | Added | Added | Frontend/API committed | Validate with real DB credentials and run build |
 | Live Assist | Partial | Demo built | Partial | Pending local build | Pending | Pending | Pending | In progress | Add app-owned live session pipeline |
 | AI Studio | Ready | Demo built | Partial | Pending local build | Pending | Pending | Pending | In progress | Bind prompt and framework tables |
 | Best Call Library | Ready | Demo built | Partial | Pending local build | Pending | Pending | Pending | In progress | Bind best call and coaching tables |
