@@ -82,6 +82,20 @@ The API response now includes a `source` field:
 - `mysql_readonly` when live read-only data is returned
 - `demo_fallback` when fallback data is returned
 
+### 5. Funnel frontend polish
+
+Updated `frontend/src/EnterpriseConsole.tsx` and added `frontend/src/funnel-polish.css`.
+
+Sales Funnel and Rejection Funnel now show:
+
+- MySQL vs demo fallback source banner
+- KPI cards
+- Funnel stages
+- Agent impact table
+- Role review cards
+- Communication template previews
+- Data-safe page-cycle structure
+
 ## Data conclusion
 
 The current database is strong enough to build the main analytics product:
@@ -106,11 +120,11 @@ The database is not yet complete for true real-time SaaS features:
 Continue the page-by-page build cycle:
 
 1. Validate Sales Funnel and Rejection Funnel with real DB credentials
-2. Improve Sales Funnel role review and communication templates
-3. Improve Rejection Funnel role review and communication templates
-4. Start Live Assist partial-production design
-5. Build Email Template Center using app-owned schema
-6. Build Coaching Calendar using app-owned schema
+2. Start Live Assist partial-production design
+3. Build Email Template Center using app-owned schema
+4. Build Coaching Calendar using app-owned schema
+5. Bind AI Studio to prompt and framework tables
+6. Bind Best Call Library to coaching and call library tables
 
 ## Safety rule
 
