@@ -19,6 +19,9 @@ import metricsRoutes from "./modules/metrics/metrics.routes";
 import executiveRoutes from "./modules/executive/executive.routes";
 import funnelRoutes from "./modules/funnels/funnels.routes";
 import liveRoutes from "./modules/live/live.routes";
+import saasRoutes from "./modules/saas/saas.routes";
+import aiStudioRoutes from "./modules/aiStudio/aiStudio.routes";
+import bestCallRoutes from "./modules/library/bestCalls.routes";
 import { authenticateToken, requireProcessAccess } from "./middleware/auth";
 
 dotenv.config();
@@ -39,6 +42,9 @@ app.get("/", (_req, res) => {
       "sales-transition-funnel",
       "rejection-transition-funnel",
       "live-assist",
+      "ai-studio",
+      "saas-admin",
+      "best-call-library",
       "audit-360",
       "coaching",
       "governance"
@@ -62,6 +68,9 @@ app.use("/api/metrics", authenticateToken, metricsRoutes);
 app.use("/api/executive", authenticateToken, executiveRoutes);
 app.use("/api/funnels", authenticateToken, requireProcessAccess, funnelRoutes);
 app.use("/api/live", authenticateToken, liveRoutes);
+app.use("/api/saas", authenticateToken, saasRoutes);
+app.use("/api/ai-studio", authenticateToken, aiStudioRoutes);
+app.use("/api/library", authenticateToken, bestCallRoutes);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
