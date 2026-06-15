@@ -96,6 +96,36 @@ Sales Funnel and Rejection Funnel now show:
 - Communication template previews
 - Data-safe page-cycle structure
 
+### 6. Live Assist partial-production contract
+
+Updated `backend/src/modules/live/live.routes.ts`.
+
+Live Assist now exposes:
+
+- Demo session payload
+- Transcript chunks
+- Live assist events
+- Parameter checklist
+- Pipeline stages
+- Readiness checks
+- Session list
+- Session event endpoint
+- Session transcript endpoint
+
+This is still a partial-production contract because real telephony streaming, PII masking enforcement, and WebSocket/SSE gateway are pending.
+
+### 7. Email Template Center contract
+
+Added `docs/EMAIL_TEMPLATE_CENTER_CONTRACT.md`.
+
+The contract defines the app-owned template model, initial templates, role review, page requirements and proposed API contract.
+
+### 8. Coaching Calendar contract
+
+Added `docs/COACHING_CALENDAR_CONTRACT.md`.
+
+The contract defines calendar event types, role review, page requirements and proposed API contract.
+
 ## Data conclusion
 
 The current database is strong enough to build the main analytics product:
@@ -119,12 +149,12 @@ The database is not yet complete for true real-time SaaS features:
 
 Continue the page-by-page build cycle:
 
-1. Validate Sales Funnel and Rejection Funnel with real DB credentials
-2. Start Live Assist partial-production design
-3. Build Email Template Center using app-owned schema
-4. Build Coaching Calendar using app-owned schema
-5. Bind AI Studio to prompt and framework tables
-6. Bind Best Call Library to coaching and call library tables
+1. Wire Live Assist frontend to pipeline and readiness
+2. Build Email Template Center UI using the app-owned contract
+3. Build Coaching Calendar UI using the app-owned contract
+4. Bind AI Studio to prompt and framework tables
+5. Bind Best Call Library to coaching and call library tables
+6. Validate Sales Funnel and Rejection Funnel with real DB credentials
 
 ## Safety rule
 
