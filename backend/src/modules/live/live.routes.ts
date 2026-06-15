@@ -22,54 +22,93 @@ const liveChecklist = [
 ];
 
 const transcript = [
-  { speaker: "Agent", ts: "00:03", text: "Good morning, this is Aarav calling regarding your premium upgrade option." },
-  { speaker: "Customer", ts: "00:18", text: "Okay, but I do not want anything expensive." },
-  { speaker: "Agent", ts: "00:31", text: "This plan is available with a special discount today." },
-  { speaker: "Customer", ts: "00:45", text: "What is the actual benefit for me?" },
-  { speaker: "Agent", ts: "01:02", text: "You will get higher coverage and priority service, which reduces your out-of-pocket risk." },
-  { speaker: "Customer", ts: "01:23", text: "That sounds useful. How soon can it activate?" },
-  { speaker: "Agent", ts: "01:48", text: "It can be activated after your confirmation. I will also explain the terms before closing." }
+  { chunkId: 1, speaker: "Agent", ts: "00:03", text: "Good morning, this is Aarav calling regarding your premium upgrade option." },
+  { chunkId: 2, speaker: "Customer", ts: "00:18", text: "Okay, but I do not want anything expensive." },
+  { chunkId: 3, speaker: "Agent", ts: "00:31", text: "This plan is available with a special discount today." },
+  { chunkId: 4, speaker: "Customer", ts: "00:45", text: "What is the actual benefit for me?" },
+  { chunkId: 5, speaker: "Agent", ts: "01:02", text: "You will get higher coverage and priority service, which reduces your out-of-pocket risk." },
+  { chunkId: 6, speaker: "Customer", ts: "01:23", text: "That sounds useful. How soon can it activate?" },
+  { chunkId: 7, speaker: "Agent", ts: "01:48", text: "It can be activated after your confirmation. I will also explain the terms before closing." }
 ];
 
+const pipeline = [
+  { stage: "Audio intake", status: "PARTIAL", targetLatency: "0-3 sec", currentMode: "Requires telephony/recording stream integration" },
+  { stage: "Speech-to-text chunking", status: "DESIGNED", targetLatency: "3-8 sec", currentMode: "Use cm_live_transcript_chunk" },
+  { stage: "PII masking", status: "REQUIRED", targetLatency: "Before AI call", currentMode: "Must enforce before production AI" },
+  { stage: "Rule engine", status: "READY", targetLatency: "Under 5 sec", currentMode: "Can run on chunks" },
+  { stage: "Next best action", status: "DESIGNED", targetLatency: "10-30 sec", currentMode: "Use cm_live_assist_event" },
+  { stage: "Supervisor whisper", status: "BACKLOG", targetLatency: "Under 10 sec", currentMode: "Needs supervisor routing" },
+  { stage: "Post-call audit", status: "READY", targetLatency: "60-90 sec after call", currentMode: "Use AI audit result tables" }
+];
+
+const readiness = [
+  { check: "Live UI demo", status: "PASS", detail: "Demo session, events, checklist and recommendations exist." },
+  { check: "App-owned live tables", status: "PASS", detail: "cm_live_session, cm_live_transcript_chunk and cm_live_assist_event proposed." },
+  { check: "Telephony stream", status: "GAP", detail: "Production audio/transcript streaming integration still required." },
+  { check: "PII masking", status: "GAP", detail: "Must be enforced before sending chunks to AI." },
+  { check: "WebSocket/SSE gateway", status: "GAP", detail: "Needed for real-time browser updates." },
+  { check: "Supervisor queue", status: "PARTIAL", detail: "Events can be created; routing rules still required." }
+];
+
+function demoPayload() {
+  return {
+    session: {
+      sessionId: "LIVE-FIN-20260616-001",
+      processCode: "FINNABLE",
+      agent: "Aarav Singh",
+      team: "Noida - Sales A",
+      callStatus: "LIVE",
+      duration: "02:42",
+      customerMood: "Interested but price-sensitive",
+      liveScore: 72,
+      predictedOutcome: "Recoverable sale",
+      nextBestAction: "Complete benefit-to-price bridge, then reconfirm consent and activation timeline."
+    },
+    transcript,
+    events: liveEvents,
+    checklist: liveChecklist,
+    recommendations: [
+      "Ask one follow-up question before giving the final discount.",
+      "Use customer concern to personalize benefit: cost protection, faster service, peace of mind.",
+      "Complete mandatory disclosure before final confirmation.",
+      "Move to close because customer asked activation timeline."
+    ],
+    pipeline,
+    readiness,
+    source: "partial_production_contract"
+  };
+}
+
 router.get("/demo", (_req, res) => {
-  res.json({
-    success: true,
-    generatedAt: new Date().toISOString(),
-    data: {
-      session: {
-        sessionId: "LIVE-FIN-20260616-001",
-        processCode: "FINNABLE",
-        agent: "Aarav Singh",
-        team: "Noida - Sales A",
-        callStatus: "LIVE",
-        duration: "02:42",
-        customerMood: "Interested but price-sensitive",
-        liveScore: 72,
-        predictedOutcome: "Recoverable sale",
-        nextBestAction: "Complete benefit-to-price bridge, then reconfirm consent and activation timeline."
-      },
-      transcript,
-      events: liveEvents,
-      checklist: liveChecklist,
-      recommendations: [
-        "Ask one follow-up question before giving the final discount.",
-        "Use customer concern to personalize benefit: cost protection, faster service, peace of mind.",
-        "Complete mandatory disclosure before final confirmation.",
-        "Move to close because customer asked activation timeline."
-      ]
-    }
-  });
+  res.json({ success: true, generatedAt: new Date().toISOString(), data: demoPayload() });
 });
 
 router.get("/sessions", (_req, res) => {
   res.json({
     success: true,
+    source: "demo_fallback",
     data: [
-      { sessionId: "LIVE-FIN-20260616-001", processCode: "FINNABLE", agent: "Aarav Singh", status: "LIVE", liveScore: 72, risk: "HIGH", duration: "02:42" },
-      { sessionId: "LIVE-INS-20260616-014", processCode: "INSURANCE-UPSELL", agent: "Meera Khan", status: "LIVE", liveScore: 88, risk: "LOW", duration: "04:18" },
-      { sessionId: "LIVE-RET-20260616-009", processCode: "RETENTION", agent: "Rohan Verma", status: "LIVE", liveScore: 61, risk: "CRITICAL", duration: "03:09" }
+      { sessionId: "LIVE-FIN-20260616-001", processCode: "FINNABLE", agent: "Aarav Singh", status: "LIVE", liveScore: 72, risk: "HIGH", duration: "02:42", nextAction: "Benefit-to-price bridge" },
+      { sessionId: "LIVE-INS-20260616-014", processCode: "INSURANCE-UPSELL", agent: "Meera Khan", status: "LIVE", liveScore: 88, risk: "LOW", duration: "04:18", nextAction: "Move to consent" },
+      { sessionId: "LIVE-RET-20260616-009", processCode: "RETENTION", agent: "Rohan Verma", status: "LIVE", liveScore: 61, risk: "CRITICAL", duration: "03:09", nextAction: "Supervisor whisper" }
     ]
   });
+});
+
+router.get("/pipeline", (_req, res) => {
+  res.json({ success: true, source: "partial_production_contract", generatedAt: new Date().toISOString(), data: pipeline });
+});
+
+router.get("/readiness", (_req, res) => {
+  res.json({ success: true, source: "partial_production_contract", generatedAt: new Date().toISOString(), data: readiness });
+});
+
+router.get("/events/:sessionId", (req, res) => {
+  res.json({ success: true, source: "demo_fallback", sessionId: req.params.sessionId, data: liveEvents });
+});
+
+router.get("/transcript/:sessionId", (req, res) => {
+  res.json({ success: true, source: "demo_fallback", sessionId: req.params.sessionId, data: transcript });
 });
 
 export default router;
