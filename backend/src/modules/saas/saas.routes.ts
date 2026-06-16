@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { DB, pool, qid } from "../../config/db";
+import { asyncHandler } from "../../middleware/asyncHandler";
 
 const router = Router();
 
@@ -33,7 +35,7 @@ const readinessChecks = [
   { area: "API route coverage", status: "PASS", score: 88, evidence: "Executive, funnel and live demo endpoints are mounted." },
   { area: "Database safety", status: "PASS", score: 92, evidence: "New demo endpoints do not perform unsafe writes to read-only source databases." },
   { area: "Real-time architecture", status: "GAP", score: 42, evidence: "Live assist demo exists; production WebSocket/SSE streaming is still pending." },
-  { area: "SaaS tenancy", status: "GAP", score: 48, evidence: "Role and process scope exists; full tenant isolation still needs schema enforcement." },
+  { area: "SaaS tenancy", status: "PARTIAL", score: 64, evidence: "Tenant persistence schema exists; runtime binding attempts app-owned tables." },
   { area: "AI governance", status: "PARTIAL", score: 64, evidence: "Governance design exists; prompt/model/version cost tracking still needs production workflows." },
   { area: "Observability", status: "GAP", score: 38, evidence: "Rate limiting, APM, error tracking and queue monitoring are still pending." }
 ];
@@ -56,13 +58,49 @@ const securityPosture = [
   { control: "Data retention policy", status: "DESIGNED", maturity: "Tenant-level setting proposed" }
 ];
 
-router.get("/tenant-summary", (_req, res) => {
-  res.json({ success: true, generatedAt: new Date().toISOString(), data: tenantSummary });
-});
+async function readOrFallback<T>(sql: string, fallback: T, mapRows: (rows: any[]) => T) {
+  try {
+    const [rows]: any = await pool.query(sql);
+    return { source: "mysql_app_owned", data: mapRows(rows || []) };
+  } catch (error: any) {
+    return { source: "demo_fallback", warning: error.message, data: fallback };
+  }
+}
 
-router.get("/feature-flags", (_req, res) => {
-  res.json({ success: true, generatedAt: new Date().toISOString(), data: featureFlags });
-});
+router.get("/tenant-summary", asyncHandler(async (_req, res) => {
+  const sql = `SELECT * FROM ${qid(DB.APP)}.cm_tenant_master ORDER BY tenant_id ASC LIMIT 1`;
+  const result = await readOrFallback(sql, tenantSummary, (rows) => {
+    const row = rows?.[0];
+    if (!row) return tenantSummary;
+    return {
+      tenantId: row.tenant_code || row.tenant_id,
+      tenantName: row.tenant_name,
+      plan: row.plan_name,
+      region: row.region_name || "India",
+      activeProcesses: 0,
+      activeUsers: 0,
+      monthlyCalls: 0,
+      aiAuditsThisMonth: 0,
+      liveAssistSessions: 0,
+      storageUsedGb: 0,
+      dataRetentionDays: Number(row.data_retention_days || 365),
+      status: row.status || "ACTIVE"
+    };
+  });
+  res.json({ success: true, generatedAt: new Date().toISOString(), ...result });
+}));
+
+router.get("/feature-flags", asyncHandler(async (_req, res) => {
+  const sql = `SELECT * FROM ${qid(DB.APP)}.cm_tenant_feature_flag ORDER BY feature_key ASC LIMIT 100`;
+  const result = await readOrFallback(sql, featureFlags, (rows) => rows.length ? rows.map((row) => ({
+    key: row.feature_key,
+    label: row.feature_label,
+    enabled: Boolean(row.enabled_flag),
+    maturity: row.maturity_status || "Configured",
+    owner: row.owner_role || "Product"
+  })) : featureFlags);
+  res.json({ success: true, generatedAt: new Date().toISOString(), ...result });
+}));
 
 router.get("/readiness", (_req, res) => {
   res.json({ success: true, generatedAt: new Date().toISOString(), data: readinessChecks });
