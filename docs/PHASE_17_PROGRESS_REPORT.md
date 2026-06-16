@@ -152,7 +152,25 @@ Added demo/readiness route files for:
 - `backend/src/modules/calendar/calendar.routes.ts`
 - `backend/src/modules/communications/communications.routes.ts`
 
-Server wiring for these two routes was blocked by the connector safety layer in this pass, so the route files exist but must be mounted in `server.ts` when the connector allows or by a local developer.
+### 11. Route wiring completed
+
+Updated `backend/src/server.ts` to mount:
+
+- `/api/communications`
+- `/api/coaching-calendar`
+
+These modules are also listed in the API root module list.
+
+### 12. Build workflow added
+
+Added `.github/workflows/build.yml`.
+
+The workflow runs:
+
+- Backend TypeScript build using `npm install` and `npm run build`
+- Frontend TypeScript/Vite build using `npm install` and `npm run build`
+
+The current ChatGPT workspace could not clone the repository due DNS resolution failure for `github.com`, so local build execution could not be completed here. GitHub workflow/status was not visible immediately after commit.
 
 ## Data conclusion
 
@@ -177,12 +195,11 @@ The database is not yet complete for true real-time SaaS features:
 
 Continue the page-by-page build cycle:
 
-1. Run local backend/frontend builds
-2. Wire Calendar and Communications routes in `server.ts`
-3. Validate Sales Funnel and Rejection Funnel with real DB credentials
-4. Bind AI Studio to prompt and framework tables
-5. Bind Best Call Library to coaching and call library tables
-6. Add tenant tables and feature flag persistence
+1. Check GitHub Actions build result when available
+2. Validate Sales Funnel and Rejection Funnel with real DB credentials
+3. Bind AI Studio to prompt and framework tables
+4. Bind Best Call Library to coaching and call library tables
+5. Add tenant tables and feature flag persistence
 
 ## Safety rule
 
