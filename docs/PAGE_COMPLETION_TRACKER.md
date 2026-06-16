@@ -12,8 +12,8 @@ Build page -> Debug -> Test -> Enhance -> Role review -> Communication review ->
 | Sales Funnel | Ready | MySQL-backed API + polished UI | Partial | Pending local build | Done for current cycle | Added | Added | Frontend/API committed | Validate with real DB credentials and run build |
 | Rejection Funnel | Ready | MySQL-backed API + polished UI | Partial | Pending local build | Done for current cycle | Added | Added | Frontend/API committed | Validate with real DB credentials and run build |
 | Live Assist | Partial | Backend contract + V2 frontend page | Partial | Pending local build | In progress | Partial | Partial | Backend/frontend committed | Validate pipeline/readiness in browser |
-| AI Studio | Ready | V2 frontend page | Partial | Pending local build | Partial | Pending | Pending | Frontend committed | Bind prompt and framework tables |
-| Best Call Library | Ready | V2 frontend page | Partial | Pending local build | Partial | Pending | Pending | Frontend committed | Bind best call and coaching tables |
+| AI Studio | Ready | V2 frontend page + binding plan | Partial | Pending local build | Partial | Added in plan | Pending | Frontend/plan committed | Implement DB binding when connector allows code mapping |
+| Best Call Library | Ready | V2 frontend page + binding plan | Partial | Pending local build | Partial | Added in plan | Pending | Frontend/plan committed | Implement DB binding when connector allows code mapping |
 | SaaS Control | Partial | V2 frontend page | Partial | Pending local build | Partial | Pending | Pending | Frontend committed | Add tenant tables and feature flag service |
 | Critical Insights | Ready | V2 frontend page | Partial | Pending local build | Partial | Pending | Pending | Frontend committed | Bind insight and action closure workflow |
 | Enterprise Readiness | Partial | V2 frontend page | Partial | Pending local build | Partial | Pending | Pending | Frontend committed | Add release and observability checks |
