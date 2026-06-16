@@ -25,6 +25,7 @@ import bestCallRoutes from "./modules/library/bestCalls.routes";
 import communicationsRoutes from "./modules/communications/communications.routes";
 import calendarRoutes from "./modules/calendar/calendar.routes";
 import clientPortalRoutes from "./modules/clientPortal/clientPortal.routes";
+import { portalAudit } from "./middleware/portalAudit";
 import { authenticateToken, requireProcessAccess } from "./middleware/auth";
 
 dotenv.config();
@@ -66,7 +67,7 @@ app.use("/api/calls", authenticateToken, requireProcessAccess, callsRoutes);
 app.use("/api/outbound", authenticateToken, requireProcessAccess, outboundRoutes);
 app.use("/api/inbound", authenticateToken, requireProcessAccess, inboundRoutes);
 app.use("/api/agents", authenticateToken, requireProcessAccess, agentsRoutes);
-app.use("/api/export", authenticateToken, requireProcessAccess, exportRoutes);
+app.use("/api/export", authenticateToken, requireProcessAccess, portalAudit({ eventType: "EXPORT", watermarkApplied: true }), exportRoutes);
 app.use("/api/coaching", authenticateToken, coachingRoutes);
 app.use("/api/governance", authenticateToken, governanceRoutes);
 app.use("/api/diagnostics", authenticateToken, diagnosticsRoutes);
@@ -79,7 +80,7 @@ app.use("/api/ai-studio", authenticateToken, aiStudioRoutes);
 app.use("/api/library", authenticateToken, bestCallRoutes);
 app.use("/api/communications", authenticateToken, communicationsRoutes);
 app.use("/api/coaching-calendar", authenticateToken, calendarRoutes);
-app.use("/api/client-portal", authenticateToken, clientPortalRoutes);
+app.use("/api/client-portal", authenticateToken, portalAudit({ eventType: "VIEW" }), clientPortalRoutes);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
