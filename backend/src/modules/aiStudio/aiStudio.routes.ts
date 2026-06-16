@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { DB, pool, qid } from "../../config/db";
+import { asyncHandler } from "../../middleware/asyncHandler";
 
 const router = Router();
 
@@ -71,16 +73,49 @@ const governanceCards = [
   { metric: "Calibration variance", value: "2.8%", status: "HEALTHY", note: "Below 3% target variance." }
 ];
 
-router.get("/prompts", (_req, res) => {
-  res.json({ success: true, generatedAt: new Date().toISOString(), data: promptVersions });
-});
+async function runReadOnly<T>(sql: string, fallback: T, mapRows: (rows: any[]) => T) {
+  try {
+    const [rows]: any = await pool.query(sql);
+    return { source: "mysql_app_owned", data: mapRows(rows || []) };
+  } catch (error: any) {
+    return { source: "demo_fallback", warning: error.message, data: fallback };
+  }
+}
+
+router.get("/prompts", asyncHandler(async (_req, res) => {
+  const sql = `SELECT * FROM ${qid(DB.APP)}.ci_ai_prompt_version_master ORDER BY 1 DESC LIMIT 50`;
+  const result = await runReadOnly(sql, promptVersions, (rows) => rows.length ? rows.map((row) => ({
+    promptId: row.prompt_version_id || row.prompt_id || row.id || "PROMPT",
+    name: row.prompt_name || row.prompt_code || row.name || "AI prompt",
+    process: row.process_code || row.process || "All Processes",
+    status: row.active_status === 0 ? "DRAFT" : "ACTIVE",
+    model: row.model_name || row.model || "Configured model",
+    schemaStatus: row.schema_validation_status || "VALID",
+    avgConfidence: Number(row.avg_confidence_percent || row.avgConfidence || 0),
+    tokenCostToday: Number(row.token_cost_today || row.tokenCostToday || 0),
+    humanOverrideRate: Number(row.human_override_rate || row.humanOverrideRate || 0),
+    lastCalibrated: String(row.last_calibrated_at || row.updated_at || row.created_at || "-").slice(0, 10)
+  })) : promptVersions);
+  res.json({ success: true, generatedAt: new Date().toISOString(), ...result });
+}));
 
 router.get("/framework", (_req, res) => {
-  res.json({ success: true, generatedAt: new Date().toISOString(), data: frameworkParameters });
+  res.json({ success: true, source: "demo_fallback", generatedAt: new Date().toISOString(), data: frameworkParameters });
 });
 
 router.get("/governance", (_req, res) => {
-  res.json({ success: true, generatedAt: new Date().toISOString(), data: governanceCards });
+  res.json({ success: true, source: "demo_fallback", generatedAt: new Date().toISOString(), data: governanceCards });
+});
+
+router.get("/readiness", (_req, res) => {
+  res.json({
+    success: true,
+    data: [
+      { check: "Prompt database binding", status: "PARTIAL", detail: "Prompt endpoint attempts read-only DB first, then fallback." },
+      { check: "Framework database binding", status: "NEXT", detail: "Framework endpoint still uses fallback." },
+      { check: "Governance database binding", status: "NEXT", detail: "Governance endpoint still uses fallback." }
+    ]
+  });
 });
 
 export default router;
