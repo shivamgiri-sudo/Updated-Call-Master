@@ -24,6 +24,7 @@ import aiStudioRoutes from "./modules/aiStudio/aiStudio.routes";
 import bestCallRoutes from "./modules/library/bestCalls.routes";
 import communicationsRoutes from "./modules/communications/communications.routes";
 import calendarRoutes from "./modules/calendar/calendar.routes";
+import clientPortalRoutes from "./modules/clientPortal/clientPortal.routes";
 import { authenticateToken, requireProcessAccess } from "./middleware/auth";
 
 dotenv.config();
@@ -49,6 +50,7 @@ app.get("/", (_req, res) => {
       "best-call-library",
       "communications",
       "coaching-calendar",
+      "client-portal",
       "audit-360",
       "coaching",
       "governance"
@@ -77,6 +79,7 @@ app.use("/api/ai-studio", authenticateToken, aiStudioRoutes);
 app.use("/api/library", authenticateToken, bestCallRoutes);
 app.use("/api/communications", authenticateToken, communicationsRoutes);
 app.use("/api/coaching-calendar", authenticateToken, calendarRoutes);
+app.use("/api/client-portal", authenticateToken, clientPortalRoutes);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
