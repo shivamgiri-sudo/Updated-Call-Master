@@ -28,6 +28,7 @@ import clientPortalRoutes from "./modules/clientPortal/clientPortal.routes";
 import { portalAudit } from "./middleware/portalAudit";
 import { authenticateToken, requireProcessAccess } from "./middleware/auth";
 import apiV1Routes from "./routes";
+import { errorHandler } from "./middleware/errorHandler";
 
 dotenv.config();
 
@@ -97,13 +98,7 @@ app.use("/api/communications", authenticateToken, communicationsRoutes);
 app.use("/api/coaching-calendar", authenticateToken, calendarRoutes);
 app.use("/api/client-portal", authenticateToken, portalAudit({ eventType: "VIEW" }), clientPortalRoutes);
 
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal server error",
-  });
-});
+app.use(errorHandler);
 
 const port = Number(process.env.PORT || 5000);
 

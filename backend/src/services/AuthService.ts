@@ -42,7 +42,7 @@ export class AuthService {
 
   generateAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
     return jwt.sign(payload, authConfig.jwt.secret, {
-      expiresIn: authConfig.jwt.accessTokenExpiry,
+      expiresIn: authConfig.jwt.accessTokenExpiry as any,
     });
   }
 
