@@ -27,6 +27,7 @@ import calendarRoutes from "./modules/calendar/calendar.routes";
 import clientPortalRoutes from "./modules/clientPortal/clientPortal.routes";
 import { portalAudit } from "./middleware/portalAudit";
 import { authenticateToken, requireProcessAccess } from "./middleware/auth";
+import apiV1Routes from "./routes";
 
 dotenv.config();
 
@@ -69,6 +70,10 @@ app.get("/", (_req, res) => {
   });
 });
 
+// v1 API routes (new cm_users-based auth + executive dashboard)
+app.use("/api", apiV1Routes);
+
+// Legacy routes (existing auth — unchanged)
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/processes", authenticateToken, processRoutes);
