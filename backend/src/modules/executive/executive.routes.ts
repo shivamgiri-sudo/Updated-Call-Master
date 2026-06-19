@@ -87,7 +87,10 @@ const actionQueue = [
 router.get("/dashboard", (_req, res) => {
   const totalCalls = processScorecards.reduce((sum, row) => sum + row.calls, 0);
   const revenue = processScorecards.reduce((sum, row) => sum + row.revenue, 0);
-  const avgConversion = Number((processScorecards.filter((r) => r.conversion > 0).reduce((sum, row) => sum + row.conversion, 0) / 3).toFixed(2));
+  const salesProcesses = processScorecards.filter((r) => r.conversion > 0);
+  const avgConversion = Number(
+    (salesProcesses.reduce((sum, row) => sum + row.conversion, 0) / (salesProcesses.length || 1)).toFixed(2)
+  );
   const avgQuality = Number((processScorecards.reduce((sum, row) => sum + row.quality, 0) / processScorecards.length).toFixed(2));
 
   res.json({

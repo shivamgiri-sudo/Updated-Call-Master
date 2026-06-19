@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { DB, pool, qid } from "../../config/db";
 import { asyncHandler } from "../../middleware/asyncHandler";
+import { getClientIdFromProcess } from "../../utils/db";
 
 const router = Router();
 
@@ -50,11 +51,6 @@ function valueLooksPositive(value: any): boolean { if (value === null || value =
 function valueLooksFailure(value: any): boolean { if (value === null || value === undefined) return false; const text = String(value).trim().toLowerCase(); return ["false", "no", "n", "0", "fail", "failed", "incorrect", "not followed", "not done", "missing"].includes(text); }
 function labelFromColumn(column: string): string { return column.replace(/[_-]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\s+/g, " ").trim().replace(/\b\w/g, (m) => m.toUpperCase()); }
 
-async function getClientIdFromProcess(processCode: string): Promise<number | null> {
-  const sql = `SELECT DISTINCT cm.client_id FROM ${qid(DB.APP)}.ci_call_master cm JOIN ${qid(DB.APP)}.ci_process_master pm ON cm.process_id = pm.process_id WHERE pm.process_code = ? AND cm.client_id IS NOT NULL LIMIT 1`;
-  const [rows]: any = await pool.query(sql, [processCode]);
-  return rows?.[0]?.client_id ?? null;
-}
 async function safeQuery<T>(sql: string, params: any[], fallback: T): Promise<T> { try { const [rows]: any = await pool.query(sql, params); return rows as T; } catch (err) { console.warn("Inbound dynamic query skipped:", err instanceof Error ? err.message : err); return fallback; } }
 async function getAuditColumns(): Promise<ColumnInfo[]> { const sql = `SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`; const [rows]: any = await pool.query(sql, [DB.AUDIT, AUDIT_TABLE]); return rows || []; }
 async function getInboundFieldMapping(): Promise<MappingResult> {

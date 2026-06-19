@@ -15,6 +15,7 @@ export interface ProcessScope {
   scope_type: "ALL" | "BRANCH" | "PROCESS" | "SELF";
   branch_short_name?: string;
   process_name?: string;
+  process_code?: string;
   employee_code?: string;
 }
 
@@ -24,7 +25,11 @@ export interface AuthRequest extends Request {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret";
-const AUTH_MODE = process.env.AUTH_MODE || "dev";
+const AUTH_MODE = process.env.AUTH_MODE ?? "dev";
+
+// Lightweight in-process auth cache (avoids 2 DB queries per request)
+const authCache = new Map<number, { user: AuthUser; scopes: ProcessScope[]; expiresAt: number }>();
+const AUTH_CACHE_TTL_MS = 60_000; // 1 minute
 
 export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   if (AUTH_MODE === "dev") {
@@ -42,9 +47,12 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     };
 
     const [scopeRows]: any = await pool.query(
-      `SELECT scope_type, branch_short_name, process_name, employee_code
-       FROM ${qid(DB.APP)}.user_scope_mapping
-       WHERE user_id = ? AND active_status = 1`,
+      `SELECT usm.scope_type, usm.branch_short_name, usm.process_name,
+              pm.process_code, usm.employee_code
+       FROM ${qid(DB.APP)}.user_scope_mapping usm
+       LEFT JOIN ${qid(DB.APP)}.ci_process_master pm
+         ON LOWER(TRIM(usm.process_name)) = LOWER(TRIM(pm.process_name))
+       WHERE usm.user_id = ? AND usm.active_status = 1`,
       [devUserId]
     );
     req.scopes = scopeRows || [];
@@ -61,29 +69,45 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
 
   try {
     const decoded: any = jwt.verify(token, JWT_SECRET);
+    const userId: number = decoded.user_id;
+
+    // Cache hit: skip both DB queries
+    const cached = authCache.get(userId);
+    if (cached && cached.expiresAt > Date.now()) {
+      req.user = cached.user;
+      req.scopes = cached.scopes;
+      return next();
+    }
 
     const [rows]: any = await pool.query(
       `SELECT user_id, employee_code, full_name, login_id, role_code, branch_short_name
        FROM ${qid(DB.APP)}.user_master
        WHERE user_id = ? AND active_status = 1 AND account_locked = 0`,
-      [decoded.user_id]
+      [userId]
     );
 
     if (!rows || rows.length === 0) {
+      authCache.delete(userId);
       return res.status(401).json({ success: false, message: "Invalid token" });
     }
 
-    const user = rows[0];
-    req.user = user;
+    const user: AuthUser = rows[0];
 
     const [scopeRows]: any = await pool.query(
-      `SELECT scope_type, branch_short_name, process_name, employee_code
-       FROM ${qid(DB.APP)}.user_scope_mapping
-       WHERE user_id = ? AND active_status = 1`,
-      [user.user_id]
+      `SELECT usm.scope_type, usm.branch_short_name, usm.process_name,
+              pm.process_code, usm.employee_code
+       FROM ${qid(DB.APP)}.user_scope_mapping usm
+       LEFT JOIN ${qid(DB.APP)}.ci_process_master pm
+         ON LOWER(TRIM(usm.process_name)) = LOWER(TRIM(pm.process_name))
+       WHERE usm.user_id = ? AND usm.active_status = 1`,
+      [userId]
     );
-    req.scopes = scopeRows || [];
+    const scopes: ProcessScope[] = scopeRows || [];
 
+    authCache.set(userId, { user, scopes, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
+
+    req.user = user;
+    req.scopes = scopes;
     next();
   } catch (err) {
     return res.status(403).json({ success: false, message: "Invalid or expired token" });
@@ -93,12 +117,18 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
 export function hasProcessAccess(scopes: ProcessScope[], processCode?: string): boolean {
   if (!processCode) return true;
   if (scopes.some((s) => s.scope_type === "ALL")) return true;
-  return scopes.some((s) => s.process_name === processCode);
+  // Compare against resolved process_code (from ci_process_master join)
+  // Fall back to process_name for backwards compatibility if join produced no code
+  return scopes.some(
+    (s) => s.process_code === processCode || (!s.process_code && s.process_name === processCode)
+  );
 }
 
 export function getAccessibleProcessCodes(scopes: ProcessScope[]): string[] | null {
   if (scopes.some((s) => s.scope_type === "ALL")) return null;
-  return scopes.filter((s) => s.process_name).map((s) => s.process_name!);
+  return scopes
+    .filter((s) => s.process_code || s.process_name)
+    .map((s) => s.process_code ?? s.process_name!);
 }
 
 export function requireProcessAccess(req: AuthRequest, res: Response, next: NextFunction) {

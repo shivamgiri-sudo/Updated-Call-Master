@@ -2,23 +2,9 @@ import { Router } from "express";
 import { DB, pool, qid } from "../../config/db";
 import { asyncHandler } from "../../middleware/asyncHandler";
 import { limitSafe, yesNoFlag } from "../../utils/sql";
+import { getClientIdFromProcess } from "../../utils/db";
 
 const router = Router();
-
-async function getClientIdFromProcess(processCode: string): Promise<number | null> {
-  const sql = `
-    SELECT DISTINCT cm.client_id
-    FROM ${qid(DB.APP)}.ci_call_master cm
-    JOIN ${qid(DB.APP)}.ci_process_master pm
-      ON cm.process_id = pm.process_id
-    WHERE pm.process_code = ?
-      AND cm.client_id IS NOT NULL
-    LIMIT 1
-  `;
-
-  const [rows]: any = await pool.query(sql, [processCode]);
-  return rows?.[0]?.client_id ?? null;
-}
 
 router.get("/:processCode/funnel", asyncHandler(async (req, res) => {
   const { processCode } = req.params;

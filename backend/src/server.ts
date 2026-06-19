@@ -33,7 +33,17 @@ dotenv.config();
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : ["http://localhost:5173", "http://localhost:5000"];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: "5mb" }));
 
 app.get("/", (_req, res) => {

@@ -108,15 +108,13 @@ router.patch("/:actionId/status", asyncHandler(async (req: AuthRequest, res) => 
     return res.status(400).json({ success: false, message: "Invalid status" });
   }
 
-  const closed_at = status === "CLOSED" ? "NOW()" : "NULL";
-
   const sql = `
     UPDATE ${qid(DB.APP)}.cm_governance_action
-    SET status = ?, closed_at = ${closed_at}
+    SET status = ?, closed_at = IF(? = 'CLOSED', NOW(), NULL)
     WHERE action_id = ?
   `;
 
-  await pool.query(sql, [status, actionId]);
+  await pool.query(sql, [status, status, Number(actionId)]);
   res.json({ success: true, message: "Status updated" });
 }));
 
@@ -124,7 +122,7 @@ router.get("/stats", asyncHandler(async (req: AuthRequest, res) => {
   const processCode = req.query.processCode as string | undefined;
 
   const whereClause = processCode ? "WHERE process_code = ?" : "";
-  const params = processCode ? [processCode, processCode, processCode, processCode] : [];
+  const params = processCode ? [processCode] : [];
 
   const sql = `
     SELECT

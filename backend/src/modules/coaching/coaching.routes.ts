@@ -110,15 +110,13 @@ router.patch("/:triggerId/status", asyncHandler(async (req: AuthRequest, res) =>
     return res.status(400).json({ success: false, message: "Invalid status" });
   }
 
-  const completed_at = status === "COMPLETED" ? "NOW()" : "NULL";
-
   const sql = `
     UPDATE ${qid(DB.APP)}.cm_coaching_trigger
-    SET status = ?, completed_at = ${completed_at}
+    SET status = ?, completed_at = IF(? = 'COMPLETED', NOW(), NULL)
     WHERE trigger_id = ?
   `;
 
-  await pool.query(sql, [status, triggerId]);
+  await pool.query(sql, [status, status, Number(triggerId)]);
   res.json({ success: true, message: "Status updated" });
 }));
 

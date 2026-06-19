@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { DB, pool, qid } from "../../config/db";
 import { asyncHandler } from "../../middleware/asyncHandler";
+import { readOrFallback } from "../../utils/db";
 
 const router = Router();
 
@@ -38,15 +39,6 @@ const accessAudit = [
   { event: "VIEW", module: "executive_iq", user: "client.viewer@example.com", status: "ALLOWED", at: "Recent" },
   { event: "EXPORT", module: "sales_funnel", user: "client.admin@example.com", status: "WATERMARKED", at: "Recent" }
 ];
-
-async function readOrFallback<T>(sql: string, fallback: T, mapRows: (rows: any[]) => T) {
-  try {
-    const [rows]: any = await pool.query(sql);
-    return { source: "mysql_app_owned", data: mapRows(rows || []) };
-  } catch (error: any) {
-    return { source: "demo_fallback", warning: error.message, data: fallback };
-  }
-}
 
 router.get("/users", asyncHandler(async (_req, res) => {
   const sql = `SELECT * FROM ${qid(DB.APP)}.cm_client_portal_user ORDER BY created_at DESC LIMIT 100`;

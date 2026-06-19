@@ -21,8 +21,9 @@ router.get("/processes/:processCode", asyncHandler(async (req, res) => {
 
   const callCountQuery = `
     SELECT COUNT(*) as call_count
-    FROM ${qid(DB.APP)}.ci_call_master
-    WHERE process_code = ?
+    FROM ${qid(DB.APP)}.ci_call_master cm
+    JOIN ${qid(DB.APP)}.ci_process_master pm ON cm.process_id = pm.process_id
+    WHERE pm.process_code = ?
   `;
   const [callRows]: any = await pool.query(callCountQuery, [processCode]);
   const callCount = callRows[0].call_count;
@@ -53,7 +54,7 @@ router.get("/processes/:processCode", asyncHandler(async (req, res) => {
 
   const coachingQuery = `
     SELECT COUNT(*) as coaching_count
-    FROM ${qid(DB.APP)}.ci_coaching_triggers
+    FROM ${qid(DB.APP)}.cm_coaching_trigger
     WHERE process_code = ?
   `;
   const [coachingRows]: any = await pool.query(coachingQuery, [processCode]);
@@ -61,7 +62,7 @@ router.get("/processes/:processCode", asyncHandler(async (req, res) => {
 
   const governanceQuery = `
     SELECT COUNT(*) as governance_count
-    FROM ${qid(DB.APP)}.ci_governance_actions
+    FROM ${qid(DB.APP)}.cm_governance_action
     WHERE process_code = ?
   `;
   const [governanceRows]: any = await pool.query(governanceQuery, [processCode]);
@@ -92,30 +93,42 @@ router.get("/available-data", asyncHandler(async (_req, res) => {
   `;
   const [processes]: any = await pool.query(processQuery);
 
-  const diagnostics = await Promise.all(processes.map(async (p: any) => {
-    const canonicalQuery = `
-      SELECT COUNT(*) as canonical_calls
-      FROM ${qid(DB.APP)}.ci_call_master
-      WHERE process_code = ?
-    `;
-    const [canonicalRows]: any = await pool.query(canonicalQuery, [p.process_code]);
-    const canonicalCalls = canonicalRows[0].canonical_calls;
+  // Single aggregate query per DB instead of N×3 individual queries
+  const [canonicalRows]: any = await pool.query(`
+    SELECT pm.process_code, COUNT(*) AS canonical_calls
+    FROM ${qid(DB.APP)}.ci_call_master cm
+    JOIN ${qid(DB.APP)}.ci_process_master pm ON cm.process_id = pm.process_id
+    GROUP BY pm.process_code
+  `);
 
-    const outboundQuery = `
-      SELECT COUNT(*) as raw_outbound_rows
-      FROM ${qid(DB.EXTERNAL)}.CallDetails
-      WHERE ProcessCode = ?
-    `;
-    const [outboundRows]: any = await pool.query(outboundQuery, [p.process_code]);
-    const rawOutboundRows = outboundRows[0].raw_outbound_rows;
+  const [outboundRows]: any = await pool.query(`
+    SELECT ProcessCode, COUNT(*) AS raw_outbound_rows
+    FROM ${qid(DB.EXTERNAL)}.CallDetails
+    WHERE ProcessCode IS NOT NULL
+    GROUP BY ProcessCode
+  `).catch(() => [[]]);
 
-    const inboundQuery = `
-      SELECT COUNT(*) as raw_inbound_rows
-      FROM ${qid(DB.AUDIT)}.call_quality_assessment
-      WHERE process_code = ?
-    `;
-    const [inboundRows]: any = await pool.query(inboundQuery, [p.process_code]);
-    const rawInboundRows = inboundRows[0].raw_inbound_rows;
+  const [inboundRows]: any = await pool.query(`
+    SELECT process_code, COUNT(*) AS raw_inbound_rows
+    FROM ${qid(DB.AUDIT)}.call_quality_assessment
+    WHERE process_code IS NOT NULL
+    GROUP BY process_code
+  `).catch(() => [[]]);
+
+  // Build lookup maps for O(1) access
+  const canonicalMap: Record<string, number> = {};
+  for (const r of canonicalRows) canonicalMap[r.process_code] = Number(r.canonical_calls);
+
+  const outboundMap: Record<string, number> = {};
+  for (const r of (outboundRows[0] ?? outboundRows)) outboundMap[r.ProcessCode] = Number(r.raw_outbound_rows);
+
+  const inboundMap: Record<string, number> = {};
+  for (const r of (inboundRows[0] ?? inboundRows)) inboundMap[r.process_code] = Number(r.raw_inbound_rows);
+
+  const diagnostics = processes.map((p: any) => {
+    const canonicalCalls = canonicalMap[p.process_code] ?? 0;
+    const rawOutboundRows = outboundMap[p.process_code] ?? 0;
+    const rawInboundRows = inboundMap[p.process_code] ?? 0;
 
     let dataStatus = "NO_DATA";
     if (canonicalCalls > 0 && (rawOutboundRows > 0 || rawInboundRows > 0)) {
@@ -133,9 +146,9 @@ router.get("/available-data", asyncHandler(async (_req, res) => {
       canonical_calls: canonicalCalls,
       raw_outbound_rows: rawOutboundRows,
       raw_inbound_rows: rawInboundRows,
-      data_status: dataStatus
+      data_status: dataStatus,
     };
-  }));
+  });
 
   res.json({ success: true, data: diagnostics });
 }));

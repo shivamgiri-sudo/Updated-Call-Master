@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { DB, pool, qid } from "../../config/db";
 import { asyncHandler } from "../../middleware/asyncHandler";
+import { readOrFallback } from "../../utils/db";
 
 const router = Router();
 
@@ -17,18 +18,9 @@ const playlists = [
   { name: "Compliance-perfect closes", calls: 12, owner: "QA", completionRate: 82, targetAudience: "All sales" }
 ];
 
-async function runReadOnly<T>(sql: string, fallback: T, mapRows: (rows: any[]) => T) {
-  try {
-    const [rows]: any = await pool.query(sql);
-    return { source: "mysql_app_owned", data: mapRows(rows || []) };
-  } catch (error: any) {
-    return { source: "demo_fallback", warning: error.message, data: fallback };
-  }
-}
-
 router.get("/best-calls", asyncHandler(async (_req, res) => {
   const sql = `SELECT * FROM ${qid(DB.APP)}.call_best_call_library ORDER BY 1 DESC LIMIT 50`;
-  const result = await runReadOnly(sql, bestCalls, (rows) => rows.length ? rows.map((row) => ({
+  const result = await readOrFallback(sql, bestCalls, (rows) => rows.length ? rows.map((row) => ({
     callId: row.call_id || row.callId || row.id || "CALL",
     process: row.process_code || row.process || "Mapped process pending",
     agent: row.agent_name || row.source_agent_name || row.agent || "Mapped agent pending",
@@ -45,7 +37,7 @@ router.get("/best-calls", asyncHandler(async (_req, res) => {
 
 router.get("/playlists", asyncHandler(async (_req, res) => {
   const sql = `SELECT * FROM ${qid(DB.APP)}.coaching_content ORDER BY 1 DESC LIMIT 50`;
-  const result = await runReadOnly(sql, playlists, (rows) => rows.length ? rows.map((row) => ({
+  const result = await readOrFallback(sql, playlists, (rows) => rows.length ? rows.map((row) => ({
     name: row.content_title || row.name || "Coaching playlist",
     calls: Number(row.call_count || row.calls || 0),
     owner: row.owner_role || row.owner || "Training",

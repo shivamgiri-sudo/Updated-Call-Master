@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { DB, pool, qid } from "../../config/db";
 import { asyncHandler } from "../../middleware/asyncHandler";
+import { readOrFallback } from "../../utils/db";
 
 const router = Router();
 
@@ -73,18 +74,9 @@ const governanceCards = [
   { metric: "Calibration variance", value: "2.8%", status: "HEALTHY", note: "Below 3% target variance." }
 ];
 
-async function runReadOnly<T>(sql: string, fallback: T, mapRows: (rows: any[]) => T) {
-  try {
-    const [rows]: any = await pool.query(sql);
-    return { source: "mysql_app_owned", data: mapRows(rows || []) };
-  } catch (error: any) {
-    return { source: "demo_fallback", warning: error.message, data: fallback };
-  }
-}
-
 router.get("/prompts", asyncHandler(async (_req, res) => {
   const sql = `SELECT * FROM ${qid(DB.APP)}.ci_ai_prompt_version_master ORDER BY 1 DESC LIMIT 50`;
-  const result = await runReadOnly(sql, promptVersions, (rows) => rows.length ? rows.map((row) => ({
+  const result = await readOrFallback(sql, promptVersions, (rows) => rows.length ? rows.map((row) => ({
     promptId: row.prompt_version_id || row.prompt_id || row.id || "PROMPT",
     name: row.prompt_name || row.prompt_code || row.name || "AI prompt",
     process: row.process_code || row.process || "All Processes",

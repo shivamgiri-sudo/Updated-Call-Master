@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { DB, pool, qid } from "../../config/db";
 import { asyncHandler } from "../../middleware/asyncHandler";
+import { getClientIdFromProcess } from "../../utils/db";
 
 const router = Router();
 
@@ -101,9 +102,7 @@ router.get("/calls", asyncHandler(async (req, res) => {
 router.get("/outbound-objections", asyncHandler(async (req, res) => {
   const processCode = req.query.processCode as string;
   if (!processCode) return res.status(400).json({ success: false, message: "processCode required" });
-  const clientIdSql = `SELECT DISTINCT cm.client_id FROM ${qid(DB.APP)}.ci_call_master cm JOIN ${qid(DB.APP)}.ci_process_master pm ON cm.process_id = pm.process_id WHERE pm.process_code = ? AND cm.client_id IS NOT NULL LIMIT 1`;
-  const [clientRows]: any = await pool.query(clientIdSql, [processCode]);
-  const clientId = clientRows?.[0]?.client_id;
+  const clientId = await getClientIdFromProcess(processCode);
   if (!clientId) {
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename=objections-${processCode}.csv`);

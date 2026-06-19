@@ -56,9 +56,12 @@ router.post("/login", asyncHandler(async (req, res) => {
   );
 
   const [scopeRows]: any = await pool.query(
-    `SELECT scope_type, branch_short_name, process_name, employee_code
-     FROM ${qid(DB.APP)}.user_scope_mapping
-     WHERE user_id = ? AND active_status = 1`,
+    `SELECT usm.scope_type, usm.branch_short_name, usm.process_name,
+            pm.process_code, usm.employee_code
+     FROM ${qid(DB.APP)}.user_scope_mapping usm
+     LEFT JOIN ${qid(DB.APP)}.ci_process_master pm
+       ON LOWER(TRIM(usm.process_name)) = LOWER(TRIM(pm.process_name))
+     WHERE usm.user_id = ? AND usm.active_status = 1`,
     [user.user_id]
   );
 

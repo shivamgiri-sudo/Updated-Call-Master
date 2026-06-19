@@ -2,6 +2,7 @@ import { Router } from "express";
 import { DB, pool, qid } from "../../config/db";
 import { asyncHandler } from "../../middleware/asyncHandler";
 import { yesNoFlag } from "../../utils/sql";
+import { getClientIdFromProcess } from "../../utils/db";
 
 const router = Router();
 
@@ -55,12 +56,6 @@ function impact(leakage: number, base: number): Impact { const p = pct(leakage, 
 function stage(key: string, label: string, count: number, previous: number, total: number, reason: string): FunnelStage {
   const leakage = Math.max(previous - count, 0);
   return { key, label, count, previousConversion: pct(count, previous || total), totalConversion: pct(count, total), leakage, leakageReason: reason, coachableImpact: impact(leakage, total) };
-}
-
-async function getClientId(processCode: string): Promise<number | null> {
-  const sql = `SELECT DISTINCT cm.client_id FROM ${qid(DB.APP)}.ci_call_master cm JOIN ${qid(DB.APP)}.ci_process_master pm ON cm.process_id = pm.process_id WHERE pm.process_code = ? AND cm.client_id IS NOT NULL LIMIT 1`;
-  const [rows]: any = await pool.query(sql, [processCode]);
-  return rows?.[0]?.client_id ?? null;
 }
 
 function dateFilter(req: any, params: any[]): string {
@@ -123,7 +118,7 @@ async function loadRejectionReasons(clientId: number, req: any) {
 router.get("/:processCode/sales-transition", asyncHandler(async (req, res) => {
   const processCode = req.params.processCode;
   try {
-    const clientId = await getClientId(processCode);
+    const clientId = await getClientIdFromProcess(processCode);
     if (!clientId) throw new Error("No client mapping found");
     const [summary, trends, agents] = await Promise.all([loadSummary(clientId, req), loadTrends(clientId, req), loadAgents(clientId, req)]);
     const total = toNumber(summary.total_calls);
@@ -150,7 +145,7 @@ router.get("/:processCode/sales-transition", asyncHandler(async (req, res) => {
 router.get("/:processCode/rejection-transition", asyncHandler(async (req, res) => {
   const processCode = req.params.processCode;
   try {
-    const clientId = await getClientId(processCode);
+    const clientId = await getClientIdFromProcess(processCode);
     if (!clientId) throw new Error("No client mapping found");
     const [summary, trends, reasons, agents] = await Promise.all([loadSummary(clientId, req), loadTrends(clientId, req), loadRejectionReasons(clientId, req), loadAgents(clientId, req)]);
     const total = toNumber(summary.total_calls);
