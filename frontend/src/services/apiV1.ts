@@ -92,8 +92,8 @@ export const executiveApi = {
     client.get<{ success: boolean; data: ExecutiveSummary }>('/executive/summary', { params }),
   scorecard: (params?: DateRangeParams) =>
     client.get<{ success: boolean; data: { processes: ProcessRow[]; dateRange: DateRange } }>('/executive/process-scorecard', { params }),
-  forecast: (params?: DateRangeParams) =>
-    client.get<{ success: boolean; data: RevenueForecast }>('/executive/revenue-forecast', { params }),
+  dailyTrend: (params?: DateRangeParams) =>
+    client.get<{ success: boolean; data: { trend: DailyPoint[]; dateRange: DateRange } }>('/executive/daily-trend', { params }),
 };
 
 // Types
@@ -135,16 +135,13 @@ export interface TrendPoint {
 export interface ExecutiveSummary {
   kpis: {
     totalCalls: number;
-    totalRevenue: number;
-    avgConversion: number;
+    criticalCalls: number;
     avgQuality: number;
-    criticalInsights: number;
-    activeRisks: number;
+    processCount: number;
+    branchCount: number;
   };
   trends: {
     calls: TrendPoint;
-    revenue: TrendPoint;
-    conversion: TrendPoint;
     quality: TrendPoint;
   };
   dateRange: DateRange;
@@ -152,14 +149,20 @@ export interface ExecutiveSummary {
 
 export interface ProcessRow {
   processCode: string;
+  processName: string;
   branchCode: string;
   calls: number;
-  connected: number;
-  conversion: number;
-  rejection: number;
+  criticalCalls: number;
   quality: number;
-  revenue: number;
+  agentCount: number;
   risk: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface DailyPoint {
+  date: string;
+  calls: number;
+  criticalCalls: number;
+  avgQuality: number;
 }
 
 export interface RevenueForecast {

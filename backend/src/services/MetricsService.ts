@@ -1,206 +1,179 @@
 // backend/src/services/MetricsService.ts
 import { RowDataPacket } from 'mysql2/promise';
 import { pools } from '../config/database';
-import { ProcessScope, BranchScope } from '../models/types';
 
 interface DateFilter {
-  from: string;  // YYYY-MM-DD
-  to: string;    // YYYY-MM-DD
+  from: string; // YYYY-MM-DD
+  to: string;
 }
 
 interface ScopeFilter {
   clientId: number;
-  processCodes: ProcessScope;
-  branchCodes: BranchScope;
+  processCodes: string[] | null;
+  branchCodes: string[] | null;
   processCode?: string;
   branchCode?: string;
 }
 
-// Build WHERE clause fragments from scope + date
-function buildScopeWhere(scope: ScopeFilter, alias = 's'): { where: string; params: any[] } {
-  const conditions: string[] = [`${alias}.client_id = ?`];
-  const params: any[] = [scope.clientId];
+function buildWhere(scope: ScopeFilter, dateAlias = 'call_date', processAlias = 'process_name', branchAlias = 'branch_short_name'): { where: string; params: any[] } {
+  const conds: string[] = [`${dateAlias} BETWEEN ? AND ?`];
+  const params: any[] = [];
 
-  // Explicit filter overrides role scope
+  // date params added by caller — listed first
   if (scope.processCode) {
-    conditions.push(`${alias}.process_code = ?`);
+    conds.push(`${processAlias} = ?`);
     params.push(scope.processCode);
   } else if (scope.processCodes && scope.processCodes.length > 0) {
-    conditions.push(`${alias}.process_code IN (${scope.processCodes.map(() => '?').join(',')})`);
+    conds.push(`${processAlias} IN (${scope.processCodes.map(() => '?').join(',')})`);
     params.push(...scope.processCodes);
   }
 
   if (scope.branchCode) {
-    conditions.push(`${alias}.branch_code = ?`);
+    conds.push(`${branchAlias} = ?`);
     params.push(scope.branchCode);
   } else if (scope.branchCodes && scope.branchCodes.length > 0) {
-    conditions.push(`${alias}.branch_code IN (${scope.branchCodes.map(() => '?').join(',')})`);
+    conds.push(`${branchAlias} IN (${scope.branchCodes.map(() => '?').join(',')})`);
     params.push(...scope.branchCodes);
   }
 
-  return { where: conditions.join(' AND '), params };
+  return { where: conds.join(' AND '), params };
 }
 
 export class MetricsService {
 
   async getExecutiveSummary(scope: ScopeFilter, dates: DateFilter) {
-    const { where, params } = buildScopeWhere(scope);
+    const { where, params } = buildWhere(scope);
 
     const [rows] = await pools.app.query<RowDataPacket[]>(
       `SELECT
-        SUM(total_calls)       AS totalCalls,
-        SUM(inbound_calls)     AS inboundCalls,
-        SUM(outbound_calls)    AS outboundCalls,
-        SUM(connected_calls)   AS connectedCalls,
-        SUM(conversion_count)  AS totalConversions,
-        SUM(rejection_count)   AS totalRejections,
-        SUM(total_revenue)     AS totalRevenue,
-        AVG(avg_qa_score)      AS avgQaScore,
-        AVG(avg_conversion_rate) AS avgConversionRate,
-        SUM(critical_errors_count) AS criticalErrors
-      FROM cm_executive_summary
-      WHERE ${where}
-        AND snapshot_date BETWEEN ? AND ?`,
-      [...params, dates.from, dates.to]
+        COUNT(*)                          AS totalCalls,
+        SUM(is_critical_call)             AS criticalCalls,
+        ROUND(AVG(quality_score), 2)      AS avgQuality,
+        COUNT(DISTINCT process_name)      AS processCount,
+        COUNT(DISTINCT branch_short_name) AS branchCount
+       FROM v_call_master_unified_kpi
+       WHERE ${where}`,
+      [dates.from, dates.to, ...params]
     );
 
-    const row = rows[0] || {};
-
-    // Fetch previous period for trends
-    const periodDays = this.daysBetween(dates.from, dates.to);
-    const prevFrom = this.subtractDays(dates.from, periodDays);
-    const prevTo = this.subtractDays(dates.to, periodDays);
+    // Previous period
+    const days = this.daysBetween(dates.from, dates.to);
+    const prevFrom = this.subtractDays(dates.from, days);
+    const prevTo   = this.subtractDays(dates.to, days);
 
     const [prevRows] = await pools.app.query<RowDataPacket[]>(
       `SELECT
-        SUM(total_calls)       AS totalCalls,
-        SUM(total_revenue)     AS totalRevenue,
-        AVG(avg_conversion_rate) AS avgConversionRate,
-        AVG(avg_qa_score)      AS avgQaScore
-      FROM cm_executive_summary
-      WHERE ${where}
-        AND snapshot_date BETWEEN ? AND ?`,
-      [...params, prevFrom, prevTo]
+        COUNT(*)                     AS totalCalls,
+        ROUND(AVG(quality_score), 2) AS avgQuality
+       FROM v_call_master_unified_kpi
+       WHERE ${where}`,
+      [prevFrom, prevTo, ...params]
     );
 
+    const row  = rows[0]  || {};
     const prev = prevRows[0] || {};
 
     return {
       kpis: {
-        totalCalls: Number(row.totalCalls || 0),
-        totalRevenue: Number(row.totalRevenue || 0),
-        avgConversion: Number(row.avgConversionRate || 0),
-        avgQuality: Number(row.avgQaScore || 0),
-        criticalInsights: Number(row.criticalErrors || 0),
-        activeRisks: this.calcActiveRisks(row),
+        totalCalls:       Number(row.totalCalls      || 0),
+        criticalCalls:    Number(row.criticalCalls   || 0),
+        avgQuality:       Number(row.avgQuality      || 0),
+        processCount:     Number(row.processCount    || 0),
+        branchCount:      Number(row.branchCount     || 0),
       },
       trends: {
-        calls: this.calcTrend(row.totalCalls, prev.totalCalls),
-        revenue: this.calcTrend(row.totalRevenue, prev.totalRevenue),
-        conversion: this.calcTrend(row.avgConversionRate, prev.avgConversionRate),
-        quality: this.calcTrend(row.avgQaScore, prev.avgQaScore),
+        calls:   this.calcTrend(row.totalCalls,  prev.totalCalls),
+        quality: this.calcTrend(row.avgQuality,  prev.avgQuality),
       },
     };
   }
 
   async getProcessScorecard(scope: ScopeFilter, dates: DateFilter) {
-    const { where, params } = buildScopeWhere(scope);
+    const { where, params } = buildWhere(scope);
 
     const [rows] = await pools.app.query<RowDataPacket[]>(
       `SELECT
-        process_code       AS processCode,
-        branch_code        AS branchCode,
-        SUM(total_calls)   AS calls,
-        SUM(connected_calls) AS connected,
-        AVG(avg_conversion_rate) AS conversion,
-        SUM(rejection_count) * 100.0 / NULLIF(SUM(total_calls),0) AS rejection,
-        AVG(avg_qa_score)  AS quality,
-        SUM(total_revenue) AS revenue,
-        SUM(critical_errors_count) AS criticalErrors
-      FROM cm_executive_summary
-      WHERE ${where}
-        AND snapshot_date BETWEEN ? AND ?
-      GROUP BY process_code, branch_code
-      ORDER BY process_code, branch_code`,
-      [...params, dates.from, dates.to]
+        pm.process_code                          AS processCode,
+        v.process_name                           AS processName,
+        v.branch_short_name                      AS branchCode,
+        COUNT(*)                                 AS calls,
+        SUM(v.is_critical_call)                  AS criticalCalls,
+        ROUND(AVG(v.quality_score), 2)           AS quality,
+        COUNT(DISTINCT v.agent_employee_code)     AS agentCount,
+        MIN(v.call_date)                         AS firstCallDate,
+        MAX(v.call_date)                         AS lastCallDate
+       FROM v_call_master_unified_kpi v
+       LEFT JOIN ci_process_master pm
+         ON TRIM(LOWER(v.process_name)) = TRIM(LOWER(pm.process_name))
+       WHERE ${where}
+       GROUP BY pm.process_code, v.process_name, v.branch_short_name
+       ORDER BY calls DESC`,
+      [dates.from, dates.to, ...params]
     );
 
     return rows.map(r => ({
-      processCode: r.processCode,
-      branchCode: r.branchCode,
-      calls: Number(r.calls || 0),
-      connected: Number(r.connected || 0),
-      conversion: Number(r.conversion || 0),
-      rejection: Number(r.rejection || 0),
-      quality: Number(r.quality || 0),
-      revenue: Number(r.revenue || 0),
-      risk: this.calcRiskLevel(r),
+      processCode:  r.processCode  || r.processName,
+      processName:  r.processName,
+      branchCode:   r.branchCode,
+      calls:        Number(r.calls        || 0),
+      criticalCalls:Number(r.criticalCalls|| 0),
+      quality:      Number(r.quality      || 0),
+      agentCount:   Number(r.agentCount   || 0),
+      risk:         this.calcRiskLevel(r),
     }));
   }
 
-  async getRevenueForecast(scope: ScopeFilter, dates: DateFilter) {
-    const summary = await this.getExecutiveSummary(scope, dates);
-    const days = this.daysBetween(dates.from, dates.to) || 1;
-    const avgCallsPerDay = summary.kpis.totalCalls / days;
-    const convRate = summary.kpis.avgConversion / 100;
-    const totalConversions = summary.kpis.totalRevenue > 0
-      ? summary.kpis.totalRevenue
-      : 0;
-    const avgTicket = totalConversions > 0 && summary.kpis.avgConversion > 0
-      ? summary.kpis.totalRevenue / (summary.kpis.totalCalls * convRate || 1)
-      : 4600;
+  async getDailyTrend(scope: ScopeFilter, dates: DateFilter) {
+    const { where, params } = buildWhere(scope);
 
-    const workingDaysPerMonth = 22;
-    const monthlyForecast = avgCallsPerDay * workingDaysPerMonth * convRate * avgTicket;
+    const [rows] = await pools.app.query<RowDataPacket[]>(
+      `SELECT
+        call_date                        AS date,
+        COUNT(*)                         AS calls,
+        SUM(is_critical_call)            AS criticalCalls,
+        ROUND(AVG(quality_score), 2)     AS avgQuality
+       FROM v_call_master_unified_kpi
+       WHERE ${where}
+       GROUP BY call_date
+       ORDER BY call_date ASC`,
+      [dates.from, dates.to, ...params]
+    );
 
-    return {
-      current: {
-        revenue: summary.kpis.totalRevenue,
-        avgTicket: Math.round(avgTicket),
-        conversionRate: summary.kpis.avgConversion,
-      },
-      forecast: {
-        monthly: Math.round(monthlyForecast),
-        quarterly: Math.round(monthlyForecast * 3),
-        confidence: convRate > 0.1 ? 'high' : convRate > 0.05 ? 'medium' : 'low',
-      },
-      assumptions: {
-        avgTicketSize: Math.round(avgTicket),
-        conversionRate: summary.kpis.avgConversion,
-        avgCallsPerDay: Math.round(avgCallsPerDay),
-        workingDays: workingDaysPerMonth,
-      },
-    };
+    return rows.map(r => ({
+      date:         r.date,
+      calls:        Number(r.calls        || 0),
+      criticalCalls:Number(r.criticalCalls|| 0),
+      avgQuality:   Number(r.avgQuality   || 0),
+    }));
   }
 
   private calcTrend(current: any, previous: any) {
-    const curr = Number(current || 0);
+    const curr = Number(current  || 0);
     const prev = Number(previous || 0);
     if (prev === 0) return { value: 0, direction: 'up' as const };
     const change = ((curr - prev) / prev) * 100;
     return {
-      value: Math.abs(Math.round(change * 10) / 10),
+      value:     Math.abs(Math.round(change * 10) / 10),
       direction: change >= 0 ? 'up' as const : 'down' as const,
     };
   }
 
   private calcRiskLevel(row: any): 'low' | 'medium' | 'high' | 'critical' {
-    const quality = Number(row.quality || 0);
-    const conversion = Number(row.conversion || 0);
-    if (quality < 60 || conversion < 5) return 'critical';
-    if (quality < 70 || conversion < 10) return 'high';
-    if (quality < 85 || conversion < 15) return 'medium';
+    const quality  = Number(row.quality  || 0);
+    const critical = Number(row.criticalCalls || 0);
+    const total    = Number(row.calls    || 1);
+    const critPct  = (critical / total) * 100;
+    if (quality > 0 && quality < 40) return 'critical';
+    if (critPct > 60) return 'critical';
+    if (quality > 0 && quality < 55) return 'high';
+    if (critPct > 40) return 'high';
+    if (quality > 0 && quality < 70) return 'medium';
+    if (critPct > 20) return 'medium';
     return 'low';
   }
 
-  private calcActiveRisks(row: any): number {
-    return Number(row.criticalErrors || 0);
-  }
-
   private daysBetween(from: string, to: string): number {
-    const d1 = new Date(from);
-    const d2 = new Date(to);
-    return Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000));
+    return Math.max(1, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000));
   }
 
   private subtractDays(dateStr: string, days: number): string {
