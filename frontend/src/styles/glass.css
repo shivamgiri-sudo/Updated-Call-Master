@@ -1,144 +1,107 @@
-/* Call Master Executive — Design System */
-/* Style: Data-Dense Dark Dashboard | Fonts: Inter + Fira Code */
+/* Call Master Executive — Light Mode Design System */
+/* Reference: Dribbble 24207284 — Purple/Teal analytics dashboard */
 
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* === COLOR TOKENS === */
-  --bg-base:          #0b0f1a;
-  --bg-surface:       #111827;
-  --bg-elevated:      #1a2235;
-  --bg-overlay:       #1f2d42;
-  --bg-hover:         rgba(255,255,255,0.04);
+  /* === BACKGROUNDS === */
+  --bg-page:       #F0F2F8;
+  --bg-card:       #FFFFFF;
+  --bg-sidebar:    #FFFFFF;
+  --bg-hover:      #F5F5FF;
+  --bg-active:     rgba(124, 92, 252, 0.08);
 
-  --border-subtle:    rgba(255,255,255,0.07);
-  --border-default:   rgba(255,255,255,0.11);
-  --border-strong:    rgba(255,255,255,0.18);
-  --border-focus:     #3b82f6;
+  /* === BRAND === */
+  --purple:        #7C5CFC;
+  --purple-light:  rgba(124, 92, 252, 0.10);
+  --purple-mid:    rgba(124, 92, 252, 0.20);
+  --purple-dark:   #5B3FD9;
+  --teal:          #3DD5C8;
+  --teal-light:    rgba(61, 213, 200, 0.12);
+  --pink:          #FF6B9D;
+  --pink-light:    rgba(255, 107, 157, 0.10);
+  --amber:         #F59E0B;
+  --amber-light:   rgba(245, 158, 11, 0.10);
 
-  --text-primary:     #f0f4ff;
-  --text-secondary:   #94a3b8;
-  --text-muted:       #64748b;
-  --text-disabled:    #334155;
+  /* === TEXT === */
+  --text-primary:  #1A1D23;
+  --text-secondary:#6B7280;
+  --text-muted:    #9CA3AF;
+  --text-on-purple:#FFFFFF;
 
-  --accent-blue:      #3b82f6;
-  --accent-blue-dim:  rgba(59,130,246,0.15);
-  --accent-teal:      #14b8a6;
-  --accent-teal-dim:  rgba(20,184,166,0.15);
-  --accent-amber:     #f59e0b;
-  --accent-amber-dim: rgba(245,158,11,0.15);
-  --accent-purple:    #8b5cf6;
-  --accent-purple-dim:rgba(139,92,246,0.15);
+  /* === STATUS === */
+  --green:         #10B981;
+  --green-light:   rgba(16, 185, 129, 0.10);
+  --red:           #EF4444;
+  --red-light:     rgba(239, 68, 68, 0.10);
+  --orange:        #F59E0B;
+  --orange-light:  rgba(245, 158, 11, 0.10);
 
-  --status-success:   #22c55e;
-  --status-success-bg:rgba(34,197,94,0.12);
-  --status-warning:   #f59e0b;
-  --status-warning-bg:rgba(245,158,11,0.12);
-  --status-danger:    #ef4444;
-  --status-danger-bg: rgba(239,68,68,0.12);
-  --status-info:      #3b82f6;
-  --status-info-bg:   rgba(59,130,246,0.12);
+  /* === BORDERS === */
+  --border:        #E8EAF0;
+  --border-focus:  #7C5CFC;
+
+  /* === SHADOWS === */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-lg:  0 8px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-purple: 0 8px 24px rgba(124, 92, 252, 0.25);
 
   /* === TYPOGRAPHY === */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'Fira Code', 'JetBrains Mono', monospace;
 
-  --text-xs:    11px;
-  --text-sm:    12px;
-  --text-base:  13px;
-  --text-md:    14px;
-  --text-lg:    16px;
-  --text-xl:    20px;
-  --text-2xl:   24px;
-  --text-3xl:   30px;
-
-  /* === SPACING (8dp system) === */
-  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
-  --sp-5: 20px;  --sp-6: 24px;  --sp-8: 32px;  --sp-10: 40px;
-  --sp-12: 48px; --sp-16: 64px;
+  /* === SPACING (8dp) === */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+  --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px;
 
   /* === RADIUS === */
-  --r-sm:  4px;
-  --r-md:  8px;
-  --r-lg:  12px;
-  --r-xl:  16px;
-
-  /* === ELEVATION / GLASS === */
-  --shadow-sm:    0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md:    0 4px 12px rgba(0,0,0,0.5);
-  --shadow-lg:    0 8px 24px rgba(0,0,0,0.6);
-  --glass-blur:   blur(16px);
-  --glass-border: 1px solid var(--border-default);
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-full: 9999px;
 
   /* === TRANSITIONS === */
-  --t-fast:   150ms ease;
-  --t-normal: 220ms ease;
+  --t-fast:   120ms ease;
+  --t-normal: 200ms ease;
 
   /* === Z-INDEX === */
-  --z-base: 0; --z-sticky: 20; --z-overlay: 40; --z-modal: 100;
+  --z-sticky: 20; --z-modal: 100;
 }
 
 /* ── RESET ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html { font-size: 13px; }
-
+html { font-size: 14px; }
 body {
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-family: var(--font);
+  font-size: 14px;
   line-height: 1.6;
   color: var(--text-primary);
-  background: var(--bg-base);
+  background: var(--bg-page);
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
 }
 
 /* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
-
-/* ── CARD ── */
-.card {
-  background: var(--bg-surface);
-  border: var(--glass-border);
-  border-radius: var(--r-lg);
-  padding: var(--sp-5);
-}
-
-.card-sm { padding: var(--sp-4); border-radius: var(--r-md); }
-
-/* ── SECTION LABEL ── */
-.section-label {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-/* ── MONO NUMBER ── */
-.mono { font-family: var(--font-mono); font-feature-settings: 'tnum'; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
 
 /* ── FOCUS ── */
-:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
 
 /* ── BADGE ── */
 .badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: var(--r-full);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
 }
-.badge-blue     { background: var(--accent-blue-dim);   color: var(--accent-blue); }
-.badge-teal     { background: var(--accent-teal-dim);   color: var(--accent-teal); }
-.badge-amber    { background: var(--accent-amber-dim);  color: var(--accent-amber); }
-.badge-purple   { background: var(--accent-purple-dim); color: var(--accent-purple); }
-.badge-success  { background: var(--status-success-bg); color: var(--status-success); }
-.badge-warning  { background: var(--status-warning-bg); color: var(--status-warning); }
-.badge-danger   { background: var(--status-danger-bg);  color: var(--status-danger); }
+.badge-purple  { background: var(--purple-light);  color: var(--purple); }
+.badge-teal    { background: var(--teal-light);    color: #0D9488; }
+.badge-green   { background: var(--green-light);   color: var(--green); }
+.badge-red     { background: var(--red-light);     color: var(--red); }
+.badge-amber   { background: var(--amber-light);   color: #B45309; }
+.badge-pink    { background: var(--pink-light);    color: #DB2777; }
