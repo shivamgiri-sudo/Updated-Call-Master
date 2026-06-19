@@ -1,5 +1,6 @@
 // backend/src/routes/v1/executive.routes.ts
 import { Router, Response } from 'express';
+import { pools } from '../../config/database';
 import { authenticateToken, enforceDataScope, requireRole, AuthRequest } from '../../middleware/authV1';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { MetricsService } from '../../services/MetricsService';
@@ -53,6 +54,20 @@ router.get('/daily-trend', authenticateToken, enforceDataScope,
     const scope = buildScope(req);
     const trend = await metrics.getDailyTrend(scope, dates);
     res.json({ success: true, data: { trend, dateRange: dates } });
+  })
+);
+
+// GET /api/v1/executive/filters — real process + branch lists from DB
+router.get('/filters', authenticateToken,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const [rows] = await (pools as any).app.query(
+      `SELECT DISTINCT process_name, branch_short_name
+       FROM v_call_master_unified_kpi
+       ORDER BY process_name, branch_short_name`
+    );
+    const processes = [...new Set((rows as any[]).map((r: any) => r.process_name))].sort();
+    const branches  = [...new Set((rows as any[]).map((r: any) => r.branch_short_name).filter(Boolean))].sort();
+    res.json({ success: true, data: { processes, branches } });
   })
 );
 

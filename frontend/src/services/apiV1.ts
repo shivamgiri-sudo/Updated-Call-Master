@@ -88,6 +88,8 @@ export const authApi = {
 
 // Executive endpoints
 export const executiveApi = {
+  filters: () =>
+    client.get<{ success: boolean; data: { processes: string[]; branches: string[] } }>('/executive/filters'),
   summary: (params?: DateRangeParams) =>
     client.get<{ success: boolean; data: ExecutiveSummary }>('/executive/summary', { params }),
   scorecard: (params?: DateRangeParams) =>

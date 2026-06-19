@@ -9,6 +9,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,7 +19,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/executive', { replace: true });
+      navigate('/v1/executive', { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.error?.message || 'Invalid email or password');
     } finally {
@@ -27,158 +28,171 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={styles.root}>
-      <div style={styles.bg} />
-
-      <form style={styles.card} onSubmit={handleSubmit} noValidate>
-        <div style={styles.logo}>
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <circle cx="20" cy="20" r="20" fill="rgba(66,153,225,0.15)" />
-            <path d="M13 20h14M20 13v14" stroke="#63b3ed" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-        </div>
-
-        <h1 style={styles.title}>Call Master</h1>
-        <p style={styles.subtitle}>Executive Dashboard</p>
-
-        {error && (
-          <div style={styles.error} role="alert">
-            {error}
+    <div style={S.page}>
+      {/* Left panel — branding */}
+      <div style={S.left}>
+        <div style={S.leftInner}>
+          <div style={S.logoRow}>
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden>
+              <rect width="32" height="32" rx="8" fill="#3b82f6" opacity=".15"/>
+              <path d="M8 22 L16 10 L24 22" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M11 18 L21 18" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <span style={S.logoText}>Call Master</span>
           </div>
-        )}
+          <h1 style={S.headline}>Enterprise Analytics<br/>Command Center</h1>
+          <p style={S.tagline}>Real-time insights across processes, branches,<br/>agents and quality outcomes.</p>
+          <div style={S.statGrid}>
+            {[
+              { label: 'Live Processes', value: '16+' },
+              { label: 'Calls Tracked', value: '1M+' },
+              { label: 'QA Parameters', value: '50+' },
+            ].map(s => (
+              <div key={s.label} style={S.stat}>
+                <div style={S.statVal}>{s.value}</div>
+                <div style={S.statLabel}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-        <label style={styles.label} htmlFor="email">Email</label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={styles.input}
-          placeholder="you@company.com"
-          autoComplete="email"
-          required
-          disabled={loading}
-        />
+      {/* Right panel — form */}
+      <div style={S.right}>
+        <form style={S.form} onSubmit={handleSubmit} noValidate>
+          <h2 style={S.formTitle}>Sign in</h2>
+          <p style={S.formSub}>Access your executive dashboard</p>
 
-        <label style={styles.label} htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={styles.input}
-          placeholder="••••••••"
-          autoComplete="current-password"
-          required
-          disabled={loading}
-        />
+          {error && (
+            <div role="alert" style={S.errorBox}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+                <circle cx="8" cy="8" r="7" stroke="#ef4444" strokeWidth="1.5"/>
+                <path d="M8 5v4M8 11v.5" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              {error}
+            </div>
+          )}
 
-        <button type="submit" style={loading ? { ...styles.btn, opacity: 0.7 } : styles.btn} disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign In'}
-        </button>
-      </form>
+          <div style={S.fieldGroup}>
+            <label style={S.label} htmlFor="email">Email address</label>
+            <input
+              id="email" type="email" autoComplete="email"
+              value={email} onChange={e => setEmail(e.target.value)}
+              style={S.input} placeholder="you@company.com"
+              required disabled={loading}
+            />
+          </div>
+
+          <div style={S.fieldGroup}>
+            <label style={S.label} htmlFor="password">Password</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="password" type={showPw ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password} onChange={e => setPassword(e.target.value)}
+                style={{ ...S.input, paddingRight: 44 }}
+                placeholder="••••••••" required disabled={loading}
+              />
+              <button
+                type="button" onClick={() => setShowPw(v => !v)}
+                style={S.pwToggle} aria-label={showPw ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPw ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" style={loading ? { ...S.btn, opacity: 0.6, cursor: 'not-allowed' } : S.btn} disabled={loading}>
+            {loading ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                <span style={S.btnSpinner} /> Signing in…
+              </span>
+            ) : 'Sign In'}
+          </button>
+
+          <p style={S.hint}>Contact your administrator to get access.</p>
+        </form>
+      </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.15) !important; outline: none; }
+        button[type=submit]:hover:not(:disabled) { background: #2563eb !important; }
+      `}</style>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  root: {
-    minHeight: '100dvh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--color-bg)',
-    position: 'relative',
-    overflow: 'hidden',
+const S: Record<string, React.CSSProperties> = {
+  page: {
+    display: 'flex', minHeight: '100dvh',
+    background: 'var(--bg-base)', fontFamily: 'var(--font-sans)',
   },
-  bg: {
-    position: 'absolute',
-    inset: 0,
-    background:
-      'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(66,153,225,0.12) 0%, transparent 70%),' +
-      'radial-gradient(ellipse 50% 50% at 80% 80%, rgba(128,90,213,0.08) 0%, transparent 60%)',
-    pointerEvents: 'none',
+  left: {
+    flex: '1 1 55%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'linear-gradient(135deg, #0f172a 0%, #0b1628 50%, #0d1f3c 100%)',
+    borderRight: '1px solid var(--border-subtle)',
+    padding: '48px',
   },
-  card: {
-    position: 'relative',
-    zIndex: 1,
-    width: '100%',
-    maxWidth: 400,
-    margin: '0 16px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.10)',
-    borderRadius: 'var(--radius-xl)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.40)',
-    padding: '40px 36px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 0,
+  leftInner: { maxWidth: 440 },
+  logoRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48 },
+  logoText: { fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.2px' },
+  headline: {
+    fontSize: 34, fontWeight: 700, lineHeight: 1.25,
+    color: 'var(--text-primary)', letterSpacing: '-0.5px', marginBottom: 16,
   },
-  logo: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginBottom: 16,
+  tagline: { fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 48 },
+  statGrid: { display: 'flex', gap: 32 },
+  stat: {},
+  statVal: { fontSize: 24, fontWeight: 700, color: 'var(--accent-blue)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.5px' },
+  statLabel: { fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em' },
+
+  right: {
+    flex: '0 0 420px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '48px 40px', background: 'var(--bg-surface)',
   },
-  title: {
-    margin: 0,
-    textAlign: 'center',
-    fontSize: 26,
-    fontWeight: 700,
-    letterSpacing: '-0.5px',
-    background: 'linear-gradient(135deg,#63b3ed,#9f7aea)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
+  form: { width: '100%', maxWidth: 340 },
+  formTitle: { fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 },
+  formSub: { fontSize: 13, color: 'var(--text-secondary)', marginBottom: 28 },
+
+  errorBox: {
+    display: 'flex', alignItems: 'flex-start', gap: 8,
+    background: 'var(--status-danger-bg)', border: '1px solid rgba(239,68,68,0.25)',
+    borderRadius: 'var(--r-md)', color: '#ef4444', padding: '10px 12px',
+    fontSize: 12, marginBottom: 20, lineHeight: 1.5,
   },
-  subtitle: {
-    margin: '4px 0 28px',
-    textAlign: 'center',
-    fontSize: 14,
-    color: 'var(--color-text-muted)',
-  },
-  error: {
-    background: 'rgba(252,129,129,0.10)',
-    border: '1px solid rgba(252,129,129,0.30)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--color-danger)',
-    padding: '10px 14px',
-    fontSize: 13,
-    marginBottom: 20,
-  },
-  label: {
-    display: 'block',
-    fontSize: 13,
-    fontWeight: 500,
-    color: 'var(--color-text-muted)',
-    marginBottom: 6,
-    marginTop: 16,
-  },
+
+  fieldGroup: { marginBottom: 18 },
+  label: { display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 },
   input: {
-    width: '100%',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--color-text)',
-    fontSize: 15,
-    padding: '11px 14px',
-    outline: 'none',
-    transition: 'border-color 150ms ease',
+    width: '100%', display: 'block',
+    background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
+    borderRadius: 'var(--r-md)', color: 'var(--text-primary)', fontSize: 13,
+    padding: '10px 12px', transition: 'border-color var(--t-fast), box-shadow var(--t-fast)',
     fontFamily: 'var(--font-sans)',
   },
-  btn: {
-    marginTop: 28,
-    width: '100%',
-    padding: '13px',
-    background: 'linear-gradient(135deg, #4299e1, #805ad5)',
-    border: 'none',
-    borderRadius: 'var(--radius-md)',
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'opacity 150ms ease, transform 150ms ease',
-    letterSpacing: '0.2px',
+  pwToggle: {
+    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', color: 'var(--text-muted)',
+    cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'color var(--t-fast)',
   },
+  btn: {
+    width: '100%', padding: '11px 16px', marginTop: 8,
+    background: 'var(--accent-blue)', border: 'none',
+    borderRadius: 'var(--r-md)', color: '#fff', fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', transition: 'background var(--t-fast)', letterSpacing: '0.1px',
+    fontFamily: 'var(--font-sans)',
+  },
+  btnSpinner: {
+    display: 'inline-block', width: 14, height: 14,
+    border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
+    borderRadius: '50%', animation: 'spin 0.7s linear infinite',
+  },
+  hint: { marginTop: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' },
 };
