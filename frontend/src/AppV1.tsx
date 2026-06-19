@@ -1,5 +1,4 @@
 // frontend/src/AppV1.tsx
-// New executive dashboard app with JWT auth — mounted at /v1/*
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -9,7 +8,6 @@ import './styles/glass.css';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
-
   if (isLoading) {
     return (
       <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
@@ -18,17 +16,17 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
   return isAuthenticated ? <>{children}</> : <Navigate to="/v1/login" replace />;
 }
 
 export default function AppV1() {
   return (
     <AuthProvider>
+      {/* Relative paths — parent already matched /v1/* */}
       <Routes>
-        <Route path="/v1/login" element={<LoginPage />} />
-        <Route path="/v1/executive" element={<RequireAuth><ExecutiveDashboard /></RequireAuth>} />
-        <Route path="/v1" element={<Navigate to="/v1/executive" replace />} />
+        <Route path="login"     element={<LoginPage />} />
+        <Route path="executive" element={<RequireAuth><ExecutiveDashboard /></RequireAuth>} />
+        <Route path="*"         element={<Navigate to="/v1/login" replace />} />
       </Routes>
     </AuthProvider>
   );
